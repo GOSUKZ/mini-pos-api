@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./app.db  # Замените на свой URL базы данных
+      # Добавьте другие переменные окружения по необходимости
+    volumes:
+      - ./data:/app/data  # Для хранения данных
+
+  # Если используете Redis для лимитера
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
