@@ -1,0 +1,7 @@
+2025-03-13 01:14:21,796 - passlib.handlers.bcrypt - WARNING - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "C:\Pycharm\shop_data\venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-03-13 01:14:22,130 - main - INFO - Создан пользователь admin с ролью администратора
