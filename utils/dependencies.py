@@ -28,7 +28,7 @@ def get_db():
     """
     from main import app
 
-    return app.db
+    return app.db_pool
 
 
 def get_db_service(db=Depends(get_db)):

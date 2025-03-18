@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     LOG_FILE: str = "api.log"
 
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

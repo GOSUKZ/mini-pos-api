@@ -1,41 +1,52 @@
+"""
+Модуль для создания базы данных и таблицы для товаров, если они не существуют.
+
+Используется для инициализации БД перед запуском сервиса.
+
+Example:
+    $ python -m utils.create_xlsx_db
+"""
+
 import asyncio
 import os
 
-import aiosqlite
+import asyncpg
 import pandas as pd
 
 
-async def create_database(db_name):
-    """Создание базы данных и таблицы для товаров, если они не существуют"""
-    conn = await aiosqlite.connect(db_name)
+async def create_database(db_url):
+    """Создание базы данных и таблицы для товаров, если они не существуют."""
+    conn = await asyncpg.connect(db_url)
 
-    # Создаем таблицу товаров
+    # Создаем таблицу, если её нет
     await conn.execute(
         """
-    CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sku_code TEXT UNIQUE,
-        barcode TEXT,
-        unit TEXT,
-        sku_name TEXT,
-        status_1c TEXT,
-        department TEXT,
-        group_name TEXT,
-        subgroup TEXT,
-        supplier TEXT,
-        cost_price REAL,
-        price REAL
+        CREATE TABLE IF NOT EXISTS products (
+            id SERIAL PRIMARY KEY,
+            sku_code TEXT UNIQUE,
+            barcode TEXT,
+            unit TEXT,
+            sku_name TEXT,
+            status_1c TEXT,
+            department TEXT,
+            group_name TEXT,
+            subgroup TEXT,
+            supplier TEXT,
+            cost_price REAL DEFAULT 0,
+            price REAL DEFAULT 0
+        )
+        """
     )
-    """
-    )
 
-    await conn.commit()
-    return conn
+    await conn.close()
 
 
-async def parse_excel_to_sqlite(excel_file, db_name):
-    """Парсинг Excel-файла и добавление данных в SQLite асинхронно"""
-    conn = await create_database(db_name)
+async def parse_excel_to_postgres(excel_file, db_url):
+    """Парсинг Excel-файла и добавление данных в PostgreSQL асинхронно."""
+    await create_database(db_url)  # Создаем БД и таблицу (если нет)
+
+    # Создаем пул соединений
+    pool = await asyncpg.create_pool(db_url)
 
     # Чтение всех листов Excel-файла
     xls = pd.ExcelFile(excel_file)
@@ -49,126 +60,104 @@ async def parse_excel_to_sqlite(excel_file, db_name):
     print(f"Начинаем обработку файла: {excel_file}")
     print(f"Найдено листов: {len(sheet_names)}")
 
-    # Обработка каждого листа
-    for sheet_name in sheet_names:
-        print(f"\nОбработка листа: {sheet_name}")
+    async with pool.acquire() as conn:
+        for sheet_name in sheet_names:
+            print(f"\nОбработка листа: {sheet_name}")
 
-        # Чтение данных с текущего листа
-        try:
-            df = pd.read_excel(excel_file, sheet_name=sheet_name)
-            sheet_records = len(df)
-            total_records += sheet_records
-            print(f"Прочитано записей: {sheet_records}")
+            try:
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                sheet_records = len(df)
+                total_records += sheet_records
+                print(f"Прочитано записей: {sheet_records}")
 
-            # Проверка наличия всех необходимых колонок
-            required_columns = [
-                "Код SKU",
-                "Штрих Код",
-                "Единица измерения",
-                "Наименование SKU",
-                "Статус 1С",
-                "Отдел",
-                "Группа",
-                "Подгруппа",
-                "Поставщик",
-            ]
+                # Проверяем наличие колонок
+                required_columns = [
+                    "Код SKU",
+                    "Штрих Код",
+                    "Единица измерения",
+                    "Наименование SKU",
+                    "Статус 1С",
+                    "Отдел",
+                    "Группа",
+                    "Подгруппа",
+                    "Поставщик",
+                ]
+                missing_columns = [col for col in required_columns if col not in df.columns]
+                if missing_columns:
+                    print(f"⚠️ Лист '{sheet_name}' пропущен (нет колонок: {missing_columns})")
+                    continue
 
-            # Проверяем наличие всех колонок
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                print(f"ВНИМАНИЕ: На листе '{sheet_name}' отсутствуют колонки: {missing_columns}")
-                print("Этот лист будет пропущен")
-                continue
+                # Пропускаем строки с пустым SKU
+                df = df.dropna(subset=["Код SKU"])
 
-            # Пропускаем строки с пустыми значениями SKU
-            df = df.dropna(subset=["Код SKU"])
+                for _, row in df.iterrows():
+                    try:
+                        sku_code = str(row["Код SKU"]).strip()
 
-            # Добавляем записи в базу данных
-            for _, row in df.iterrows():
-                try:
-                    # Проверяем, существует ли уже этот товар в базе
-                    async with conn.execute(
-                        "SELECT sku_code FROM products WHERE sku_code = ?", (row["Код SKU"],)
-                    ) as cursor:
-                        result = await cursor.fetchone()
+                        # Проверяем существование товара
+                        exists = await conn.fetchval(
+                            "SELECT 1 FROM products WHERE sku_code = $1", sku_code
+                        )
+                        if exists:
+                            skipped_records += 1
+                            continue
 
-                    if result:
-                        # Товар уже существует, пропускаем
+                        # Вставляем данные
+                        await conn.execute(
+                            """
+                            INSERT INTO products (
+                                sku_code, barcode, unit, sku_name, status_1c,
+                                department, group_name, subgroup, supplier,
+                                cost_price, price
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0)
+                            """,
+                            sku_code,
+                            str(row["Штрих Код"]).strip(),
+                            str(row["Единица измерения"]).strip(),
+                            str(row["Наименование SKU"]).strip(),
+                            str(row["Статус 1С"]).strip(),
+                            str(row["Отдел"]).strip(),
+                            str(row["Группа"]).strip(),
+                            str(row["Подгруппа"]).strip(),
+                            str(row["Поставщик"]).strip(),
+                        )
+                        added_records += 1
+
+                    except asyncpg.UniqueViolationError:
                         skipped_records += 1
-                        continue
+                    except Exception as e:
+                        print(f"❌ Ошибка при обработке строки: {e}")
 
-                    # Добавляем новый товар
-                    await conn.execute(
-                        """
-                    INSERT INTO products (
-                        sku_code, barcode, unit, sku_name, status_1c, 
-                        department, group_name, subgroup, supplier,
-                        cost_price, price
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                        (
-                            row["Код SKU"],
-                            row["Штрих Код"],
-                            row["Единица измерения"],
-                            row["Наименование SKU"],
-                            row["Статус 1С"],
-                            row["Отдел"],
-                            row["Группа"],
-                            row["Подгруппа"],
-                            row["Поставщик"],
-                            0,  # Пустое значение для себестоимости
-                            0,  # Пустое значение для цены
-                        ),
-                    )
-                    added_records += 1
+                await conn.execute("COMMIT")  # Сохраняем изменения
 
-                except aiosqlite.IntegrityError:
-                    # Обработка ошибки уникальности
-                    skipped_records += 1
-                    continue
-                except Exception as e:
-                    print(f"Ошибка при обработке строки: {e}")
-                    continue
+            except Exception as e:
+                print(f"❌ Ошибка на листе '{sheet_name}': {e}")
 
-            # Сохраняем изменения
-            await conn.commit()
+    await pool.close()
 
-        except Exception as e:
-            print(f"Ошибка при обработке листа '{sheet_name}': {e}")
-
-    # Выводим общую статистику
+    # Выводим статистику
     print("\n" + "=" * 50)
-    print("ИТОГИ ИМПОРТА:")
-    print(f"Всего обработано записей: {total_records}")
-    print(f"Добавлено новых товаров: {added_records}")
-    print(f"Пропущено (уже существующих): {skipped_records}")
+    print("✅ ИТОГИ ИМПОРТА:")
+    print(f"📦 Всего обработано записей: {total_records}")
+    print(f"✅ Добавлено новых товаров: {added_records}")
+    print(f"⚠️ Пропущено (уже существующих): {skipped_records}")
     print("=" * 50)
-
-    # Закрываем соединение
-    await conn.close()
 
 
 async def main():
-    # Путь к Excel файлу (можно изменить)
-    excel_file = input("Введите путь к Excel файлу: ")
+    """
+    Главная функция, которая запрашивает файл Excel и URL PostgreSQL,
+    а затем вызывает функцию parse_excel_to_postgres для импорта данных.
+    """
+    excel_file = "data.xlsx"
 
-    # Проверка существования файла
-    if not os.path.exists(excel_file):
-        print(f"Ошибка: Файл '{excel_file}' не найден.")
-        return
-
-    # Имя базы данных SQLite (можно изменить)
-    db_name = (
-        input("Введите имя файла базы данных SQLite (по умолчанию 'products.db'): ")
-        or "products.db"
+    await parse_excel_to_postgres(
+        excel_file, "postgresql://makkenzo:qwerty@localhost:5432/claude_data_shop"
     )
 
-    # Запускаем парсинг
-    await parse_excel_to_sqlite(excel_file, db_name)
-
-    print(f"\nОбработка завершена. База данных сохранена в файл '{db_name}'")
+    print("\n✅ Импорт завершен!")
 
 
 if __name__ == "__main__":
-    # Запускаем асинхронную программу
+    asyncio.run(main())
     asyncio.run(main())

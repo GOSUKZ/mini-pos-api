@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import timedelta
 import logging
-from utils.dependencies import get_auth_service
-from services.auth_service import AuthService
-from core.models import UserCreate, UserLogin, Token
-from config import get_settings
-from fastapi import APIRouter, Depends, Request, HTTPException, Response
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+
+from config import get_settings
+from core.models import Token, UserCreate, UserLogin
+from services.auth_service import AuthService
 from utils.dependencies import get_auth_service
 
 logger = logging.getLogger("auth_router")
@@ -55,7 +55,7 @@ async def login_for_access_token(
     """
     Получение токена доступа.
     """
-    logger.info(f"Запрос токена для пользователя: {form_data.username}")
+    logger.info("Запрос токена для пользователя: %s", form_data.username)
 
     try:
         user = await auth_service.authenticate_user(
@@ -64,7 +64,7 @@ async def login_for_access_token(
 
         if not user:
             logger.warning(
-                f"Неудачная попытка аутентификации для пользователя: {form_data.username}"
+                "Неудачная попытка аутентификации для пользователя: %s", form_data.username
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

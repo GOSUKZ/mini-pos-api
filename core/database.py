@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-import aiosqlite
+import asyncpg
 
 logger = logging.getLogger("database_service")
 
@@ -13,14 +13,10 @@ class DatabaseService:
     Реализует паттерн Repository для отделения логики доступа к данным.
     """
 
-    def __init__(self, db_connection):
-        """
-        Инициализирует сервис с соединением с базой данных.
-
-        Args:
-            db_connection: Объект соединения с базой данных
-        """
-        self.db = db_connection
+    def __init__(self, db_pool: Optional[asyncpg.Pool]):
+        if db_pool is None:
+            raise ValueError("db_pool не инициализирован!")
+        self.pool = db_pool
 
     async def get_products(
         self,
@@ -49,57 +45,63 @@ class DatabaseService:
         Returns:
             Список словарей с данными товаров
         """
-        query_parts = ["SELECT * FROM products WHERE 1=1"]
+        query_parts = ["SELECT * FROM products WHERE TRUE"]
         params = []
+        param_index = 1  # PostgreSQL использует $1, $2...
 
         if search:
-            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            query_parts.append(
+                f"AND (sku_name ILIKE ${param_index} OR sku_code ILIKE ${param_index + 1} OR barcode ILIKE ${param_index + 2})"
+            )
             search_term = f"%{search}%"
             params.extend([search_term, search_term, search_term])
+            param_index += 3
 
         if department:
-            query_parts.append("AND department = ?")
+            query_parts.append(f"AND department = ${param_index}")
             params.append(department)
+            param_index += 1
 
         if min_price is not None:
-            query_parts.append("AND price >= ?")
+            query_parts.append(f"AND price >= ${param_index}")
             params.append(min_price)
+            param_index += 1
 
         if max_price is not None:
-            query_parts.append("AND price <= ?")
+            query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
 
-        if sort_by:
-            valid_columns = [
-                "id",
-                "sku_code",
-                "sku_name",
-                "price",
-                "cost_price",
-                "supplier",
-                "department",
-            ]
-            if sort_by in valid_columns:
-                query_parts.append(f"ORDER BY {sort_by} {sort_order}")
-            else:
-                raise ValueError(
-                    f"Invalid sort_by parameter. Valid options: {', '.join(valid_columns)}"
-                )
+        valid_columns = [
+            "id",
+            "sku_code",
+            "sku_name",
+            "price",
+            "cost_price",
+            "supplier",
+            "department",
+        ]
+
+        if sort_by and sort_by in valid_columns:
+            sort_order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            query_parts.append(f"ORDER BY {sort_by} {sort_order}")
         else:
             query_parts.append("ORDER BY id ASC")
 
-        query_parts.append("LIMIT ? OFFSET ?")
+        query_parts.append(f"LIMIT ${param_index} OFFSET ${param_index + 1}")
         params.extend([limit, skip])
 
         query = " ".join(query_parts)
 
-        try:
-            async with self.db.execute(query, params) as cursor:
-                products = [dict(row) for row in await cursor.fetchall()]
+        logger.info("Query: %s", query)
 
-            return products
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка товаров: {str(e)}")
+            logger.error(f"Ошибка при получении списка товаров: {e}")
             raise
 
     async def get_local_products(
@@ -114,57 +116,78 @@ class DatabaseService:
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        query_parts = ["SELECT * FROM local_products WHERE user_id = ? AND 1=1"]
+        """
+        Получает список локальных товаров пользователя с фильтрами и сортировкой.
+
+        Args:
+            user_id: ID пользователя
+            skip: Количество записей для пропуска (пагинация)
+            limit: Максимальное количество записей для возврата
+            search: Строка поиска
+            sort_by: Поле для сортировки
+            sort_order: Порядок сортировки (asc или desc)
+            department: Фильтр по отделу
+            min_price: Минимальная цена
+            max_price: Максимальная цена
+
+        Returns:
+            Список словарей с данными товаров
+        """
+        query_parts = ["SELECT * FROM local_products WHERE user_id = $1"]
         params = [user_id]
+        param_index = 2  # PostgreSQL использует $1, $2, $3...
 
         if search:
-            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            query_parts.append(
+                f"AND (sku_name ILIKE ${param_index} OR sku_code ILIKE ${param_index + 1} OR barcode ILIKE ${param_index + 2})"
+            )
             search_term = f"%{search}%"
             params.extend([search_term, search_term, search_term])
+            param_index += 3
 
         if department:
-            query_parts.append("AND department = ?")
+            query_parts.append(f"AND department = ${param_index}")
             params.append(department)
+            param_index += 1
 
         if min_price is not None:
-            query_parts.append("AND price >= ?")
+            query_parts.append(f"AND price >= ${param_index}")
             params.append(min_price)
+            param_index += 1
 
         if max_price is not None:
-            query_parts.append("AND price <= ?")
+            query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
 
-        if sort_by:
-            valid_columns = [
-                "id",
-                "sku_code",
-                "sku_name",
-                "price",
-                "cost_price",
-                "supplier",
-                "department",
-            ]
-            if sort_by in valid_columns:
-                query_parts.append(f"ORDER BY {sort_by} {sort_order}")
-            else:
-                raise ValueError(
-                    "Invalid sort_by parameter. Valid options: %s", ", ".join(valid_columns)
-                )
+        valid_columns = [
+            "id",
+            "sku_code",
+            "sku_name",
+            "price",
+            "cost_price",
+            "supplier",
+            "department",
+        ]
+
+        if sort_by and sort_by in valid_columns:
+            sort_order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            query_parts.append(f"ORDER BY {sort_by} {sort_order}")
         else:
             query_parts.append("ORDER BY id ASC")
 
-        query_parts.append("LIMIT ? OFFSET ?")
+        query_parts.append(f"LIMIT ${param_index} OFFSET ${param_index + 1}")
         params.extend([limit, skip])
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                products = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
 
-            return products
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка товаров: {str(e)}")
+            logger.error(f"Ошибка при получении списка товаров: {e}")
             raise
 
     async def get_products_count(
@@ -188,32 +211,39 @@ class DatabaseService:
         """
         query_parts = ["SELECT COUNT(*) FROM products WHERE 1=1"]
         params = []
+        param_index = 1  # PostgreSQL использует $1, $2, $3...
 
         if search:
-            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            query_parts.append(
+                f"AND (sku_name ILIKE ${param_index} OR sku_code ILIKE ${param_index + 1} OR barcode ILIKE ${param_index + 2})"
+            )
             search_term = f"%{search}%"
             params.extend([search_term, search_term, search_term])
+            param_index += 3
 
         if department:
-            query_parts.append("AND department = ?")
+            query_parts.append(f"AND department = ${param_index}")
             params.append(department)
+            param_index += 1
 
         if min_price is not None:
-            query_parts.append("AND price >= ?")
+            query_parts.append(f"AND price >= ${param_index}")
             params.append(min_price)
+            param_index += 1
 
         if max_price is not None:
-            query_parts.append("AND price <= ?")
+            query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                total_count = await cursor.fetchone()
-                return total_count[0] if total_count else 0
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(query, *params)
+            return result if result else 0
         except Exception as e:
-            logger.error(f"Ошибка при получении количества товаров: {str(e)}")
+            logger.error(f"Ошибка при получении количества товаров: {e}")
             raise
 
     async def get_local_products_count(
@@ -225,9 +255,10 @@ class DatabaseService:
         max_price: Optional[float] = None,
     ) -> int:
         """
-        Получает общее количество товаров с учетом фильтрации.
+        Получает общее количество товаров пользователя с учетом фильтрации.
 
         Args:
+            user_id: ID пользователя
             search: Строка поиска
             department: Фильтр по отделу
             min_price: Минимальная цена
@@ -236,34 +267,41 @@ class DatabaseService:
         Returns:
             Общее количество товаров
         """
-        query_parts = ["SELECT COUNT(*) FROM local_products WHERE user_id = ? AND 1=1"]
+        query_parts = ["SELECT COUNT(*) FROM local_products WHERE user_id = $1"]
         params = [user_id]
+        param_index = 2  # PostgreSQL использует $1, $2, $3...
 
         if search:
-            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            query_parts.append(
+                f"AND (sku_name ILIKE ${param_index} OR sku_code ILIKE ${param_index + 1} OR barcode ILIKE ${param_index + 2})"
+            )
             search_term = f"%{search}%"
             params.extend([search_term, search_term, search_term])
+            param_index += 3
 
         if department:
-            query_parts.append("AND department = ?")
+            query_parts.append(f"AND department = ${param_index}")
             params.append(department)
+            param_index += 1
 
         if min_price is not None:
-            query_parts.append("AND price >= ?")
+            query_parts.append(f"AND price >= ${param_index}")
             params.append(min_price)
+            param_index += 1
 
         if max_price is not None:
-            query_parts.append("AND price <= ?")
+            query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                total_count = await cursor.fetchone()
-                return total_count[0] if total_count else 0
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(query, *params)
+            return result if result else 0
         except Exception as e:
-            logger.error(f"Ошибка при получении количества товаров: {str(e)}")
+            logger.error(f"Ошибка при получении количества товаров: {e}")
             raise
 
     async def get_product_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
@@ -277,17 +315,11 @@ class DatabaseService:
             Информация о товаре или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM products WHERE barcode = ?", (barcode,)
-            ) as cursor:
-                result = await cursor.fetchone()
-
-                if result:
-                    return dict(result)
-
-                return None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM products WHERE barcode = $1", barcode)
+                return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении товара по штрих-коду из БД: {str(e)}")
+            logger.error("Ошибка при получении товара по штрих-коду из БД: %s", str(e))
             raise
 
     async def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
@@ -301,12 +333,9 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM products WHERE id = ?", (product_id,)
-            ) as cursor:
-                product = await cursor.fetchone()
-
-            return dict(product) if product else None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM products WHERE id = $1", product_id)
+                return dict(row) if row else None
         except Exception as e:
             logger.error("Ошибка при получении товара по ID %s: %s", product_id, str(e))
             raise
@@ -322,12 +351,9 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM local_products WHERE id = ?", (product_id,)
-            ) as cursor:
-                product = await cursor.fetchone()
-
-            return dict(product) if product else None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM local_products WHERE id = $1", product_id)
+                return dict(row) if row else None
         except Exception as e:
             logger.error("Ошибка при получении товара по ID %s: %s", product_id, str(e))
             raise
@@ -343,14 +369,11 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM products WHERE sku_code = ?", (sku_code,)
-            ) as cursor:
-                product = await cursor.fetchone()
-
-            return dict(product) if product else None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM products WHERE sku_code = $1", sku_code)
+                return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении товара по SKU {sku_code}: {str(e)}")
+            logger.error("Ошибка при получении товара по SKU %s: %s", sku_code, str(e))
             raise
 
     async def get_local_product_by_sku(
@@ -366,13 +389,13 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM local_products WHERE user_id = ? AND sku_code = ?",
-                (user_id, sku_code),
-            ) as cursor:
-                product = await cursor.fetchone()
-
-            return dict(product) if product else None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT * FROM local_products WHERE user_id = $1 AND sku_code = $2",
+                    user_id,
+                    sku_code,
+                )
+                return dict(row) if row else None
         except Exception as e:
             logger.error("Ошибка при получении товара по SKU %s: %s", sku_code, str(e))
             raise
@@ -388,70 +411,55 @@ class DatabaseService:
             Словарь с данными созданного товара, включая ID
         """
         fields = product_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        placeholders = ", ".join([f"${i+1}" for i in range(len(fields))])  # Используем $1, $2, ...
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO products ({fields_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO products ({fields_str}) VALUES ({placeholders}) RETURNING *"
 
         try:
-            await self.db.execute(query, list(product_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    row = await conn.fetchrow(query, *product_data.values())
 
-            # Получаем ID созданного товара
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                product_id = result["id"]
-
-            # Получаем полные данные продукта
-            async with self.db.execute(
-                "SELECT * FROM products WHERE id = ?", (product_id,)
-            ) as cursor:
-                product_data = await cursor.fetchone()
-
-            return dict(product_data)
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании товара: {str(e)}")
+            logger.error("Ошибка при создании товара: %s", str(e))
             raise
 
     async def create_local_product(
         self, product_data: Dict[str, Any], user_id: str
     ) -> Dict[str, Any]:
         """
-        Создает новый товар.
+        Создает новый локальный товар.
 
         Args:
             product_data: Словарь с данными товара
+            user_id: ID пользователя
 
         Returns:
             Словарь с данными созданного товара, включая ID
         """
         product_data["user_id"] = user_id
-        fields = product_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        fields = list(product_data.keys())
+        placeholders = ", ".join([f"${i+1}" for i in range(len(fields))])  # Используем $1, $2, ...
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO local_products ({fields_str}) VALUES ({placeholders})"
+        query = f"""
+            INSERT INTO local_products ({fields_str})
+            VALUES ({placeholders})
+            RETURNING *
+        """
 
         try:
-            await self.db.execute(query, list(product_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():  # Используем транзакцию
+                    row = await conn.fetchrow(
+                        query, *product_data.values()
+                    )  # fetchrow() сразу возвращает данные
 
-            # Получаем ID созданного товара
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                product_id = result["id"]
-
-            # Получаем полные данные продукта
-            async with self.db.execute(
-                "SELECT * FROM local_products WHERE id = ?", (product_id,)
-            ) as cursor:
-                product_data = await cursor.fetchone()
-
-            return dict(product_data)
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error("Ошибка при создании товара: %s", str(e))
+            logger.error("Ошибка при создании локального товара: %s", str(e))
             raise
 
     async def update_product(
@@ -473,37 +481,30 @@ class DatabaseService:
         set_parts = []
         params = []
 
-        for key, value in product_data.items():
-            set_parts.append(f"{key} = ?")
+        for i, (key, value) in enumerate(product_data.items(), start=1):
+            set_parts.append(f"{key} = ${i}")
             params.append(value)
 
         params.append(product_id)
-        query = f"UPDATE products SET {', '.join(set_parts)} WHERE id = ?"
+        query = f"UPDATE products SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    row = await conn.fetchrow(
+                        query, *params
+                    )  # fetchrow() сразу возвращает обновленные данные
 
-            if result.rowcount == 0:
-                return None
-
-            # Получаем обновленные данные
-            async with self.db.execute(
-                "SELECT * FROM products WHERE id = ?", (product_id,)
-            ) as cursor:
-                updated_product = await cursor.fetchone()
-
-            return dict(updated_product) if updated_product else None
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
             raise
 
     async def update_local_product(
         self, product_id: int, product_data: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """
-        Обновляет данные товара.
+        Обновляет данные локального товара.
 
         Args:
             product_id: ID товара
@@ -513,35 +514,28 @@ class DatabaseService:
             Словарь с обновленными данными товара или None, если товар не найден
         """
         if not product_data:
-            return await self.get_product_by_id(product_id)
+            return await self.get_local_product_by_id(product_id)
 
         set_parts = []
         params = []
 
-        for key, value in product_data.items():
-            set_parts.append(f"{key} = ?")
+        for i, (key, value) in enumerate(product_data.items(), start=1):
+            set_parts.append(f"{key} = ${i}")
             params.append(value)
 
         params.append(product_id)
-        query = f"UPDATE local_products SET {', '.join(set_parts)} WHERE id = ?"
+        query = f"UPDATE local_products SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    row = await conn.fetchrow(
+                        query, *params
+                    )  # fetchrow() сразу возвращает обновленные данные
 
-            if result.rowcount == 0:
-                return None
-
-            # Получаем обновленные данные
-            async with self.db.execute(
-                "SELECT * FROM local_products WHERE id = ?", (product_id,)
-            ) as cursor:
-                updated_product = await cursor.fetchone()
-
-            return dict(updated_product) if updated_product else None
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при обновлении локального товара с ID %s: %s", product_id, e)
             raise
 
     async def delete_product(self, product_id: int) -> bool:
@@ -554,19 +548,21 @@ class DatabaseService:
         Returns:
             True, если товар успешно удален, иначе False
         """
-        try:
-            result = await self.db.execute("DELETE FROM products WHERE id = ?", (product_id,))
-            await self.db.commit()
+        query = "DELETE FROM products WHERE id = $1"
 
-            return result.rowcount > 0
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    result = await conn.execute(query, product_id)
+
+            return result.startswith("DELETE")  # asyncpg возвращает строку 'DELETE <количество>'
         except Exception as e:
-            await self.db.rollback()
-            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
+            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, e)
             raise
 
     async def delete_local_product(self, product_id: int) -> bool:
         """
-        Удаляет товар.
+        Удаляет локальный товар.
 
         Args:
             product_id: ID товара
@@ -574,15 +570,19 @@ class DatabaseService:
         Returns:
             True, если товар успешно удален, иначе False
         """
-        try:
-            result = await self.db.execute("DELETE FROM local_products WHERE id = ?", (product_id,))
-            await self.db.commit()
+        query = "DELETE FROM local_products WHERE id = $1"
 
-            return result.rowcount > 0
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    result = await conn.execute(query, product_id)
+
+            return result.startswith("DELETE")  # asyncpg возвращает строку 'DELETE <количество>'
         except Exception as e:
-            await self.db.rollback()
-            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
+            logger.error("Ошибка при удалении локального товара с ID %s: %s", product_id, e)
             raise
+
+    from datetime import datetime
 
     async def add_audit_log(
         self, action: str, entity: str, entity_id: str, user_id: str, details: str = ""
@@ -602,24 +602,20 @@ class DatabaseService:
         """
         query = """
         INSERT INTO audit_log (action, entity, entity_id, user_id, timestamp, details)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
         """
 
         try:
-            await self.db.execute(
-                query, (action, entity, entity_id, user_id, datetime.utcnow(), details)
-            )
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    result = await conn.fetchval(
+                        query, action, entity, entity_id, user_id, datetime.utcnow(), details
+                    )
 
-            # Получаем ID созданной записи
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                log_id = result["id"]
-
-            return log_id
+            return result
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при добавлении записи в аудит: {str(e)}")
+            logger.error("Ошибка при добавлении записи в аудит: %s", e)
             raise
 
     async def get_audit_logs(
@@ -651,37 +647,40 @@ class DatabaseService:
         params = []
 
         if entity:
-            query_parts.append("AND entity = ?")
+            query_parts.append("AND entity = $1")
             params.append(entity)
 
         if action:
-            query_parts.append("AND action = ?")
+            query_parts.append(f"AND action = ${len(params) + 1}")
             params.append(action)
 
         if user_id:
-            query_parts.append("AND user_id = ?")
+            query_parts.append(f"AND user_id = ${len(params) + 1}")
             params.append(user_id)
 
         if from_date:
-            query_parts.append("AND timestamp >= ?")
+            query_parts.append(f"AND timestamp >= ${len(params) + 1}")
             params.append(from_date)
 
         if to_date:
-            query_parts.append("AND timestamp <= ?")
+            query_parts.append(f"AND timestamp <= ${len(params) + 1}")
             params.append(to_date)
 
-        query_parts.append("ORDER BY timestamp DESC LIMIT ? OFFSET ?")
+        query_parts.append(
+            f"ORDER BY timestamp DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"
+        )
         params.extend([limit, skip])
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                logs = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+                logs = [dict(row) for row in rows]
 
             return logs
         except Exception as e:
-            logger.error(f"Ошибка при получении записей аудита: {str(e)}")
+            logger.error("Ошибка при получении записей аудита: %s", e)
             raise
 
     async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
@@ -694,11 +693,11 @@ class DatabaseService:
         Returns:
             Словарь с данными пользователя или None, если пользователь не найден
         """
+        query = "SELECT * FROM users WHERE username = $1"
+
         try:
-            async with self.db.execute(
-                "SELECT * FROM users WHERE username = ?", (username,)
-            ) as cursor:
-                user = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                user = await conn.fetchrow(query, username)
 
             if user:
                 user_dict = dict(user)
@@ -707,7 +706,7 @@ class DatabaseService:
 
             return None
         except Exception as e:
-            logger.error(f"Ошибка при получении пользователя {username}: {str(e)}")
+            logger.error("Ошибка при получении пользователя %s: %s", username, e)
             raise
 
     async def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -720,27 +719,22 @@ class DatabaseService:
         Returns:
             Словарь с данными созданного пользователя, включая ID
         """
-        # Преобразуем список ролей в строку
         if "roles" in user_data and isinstance(user_data["roles"], list):
             user_data["roles"] = ",".join(user_data["roles"])
 
         fields = user_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO users ({fields_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO users ({fields_str}) VALUES ({placeholders}) RETURNING username"
 
         try:
-            await self.db.execute(query, list(user_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                username = await conn.fetchval(query, *user_data.values())
 
-            # Получаем созданного пользователя
-            user = await self.get_user_by_username(user_data["username"])
-
-            return user
+            return await self.get_user_by_username(username)
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании пользователя: {str(e)}")
+            logger.error("Ошибка при создании пользователя: %s", e)
             raise
 
     async def update_user(
@@ -763,34 +757,20 @@ class DatabaseService:
         if "roles" in user_data and isinstance(user_data["roles"], list):
             user_data["roles"] = ",".join(user_data["roles"])
 
-        set_parts = []
-        params = []
-
-        for key, value in user_data.items():
-            set_parts.append(f"{key} = ?")
-            params.append(value)
-
-        params.append(username)
-        query = f"UPDATE users SET {', '.join(set_parts)} WHERE username = ?"
+        set_parts = [f"{key} = ${i+1}" for i, key in enumerate(user_data.keys())]
+        query = f"UPDATE users SET {', '.join(set_parts)} WHERE username = ${len(user_data) + 1} RETURNING username"
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(query, *user_data.values(), username)
 
-            if result.rowcount == 0:
+            if not result:
                 return None
 
-            # Получаем обновленные данные
             return await self.get_user_by_username(username)
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении пользователя {username}: {str(e)}")
+            logger.error("Ошибка при обновлении пользователя %s: %s", username, e)
             raise
-
-    """
-        Дополнительные методы для DatabaseService для работы с OAuth и платежами.
-        Скопируйте эти методы в существующий класс DatabaseService.
-        """
 
     async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """
@@ -803,8 +783,8 @@ class DatabaseService:
             Словарь с данными пользователя или None, если пользователь не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM users WHERE email = ?", (email,)) as cursor:
-                user = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", email)
 
             if user:
                 user_dict = dict(user)
@@ -813,7 +793,7 @@ class DatabaseService:
 
             return None
         except Exception as e:
-            logger.error(f"Ошибка при получении пользователя по email {email}: {str(e)}")
+            logger.error("Ошибка при получении пользователя по email %s: %s", email, e)
             raise
 
     async def get_oauth_account(
@@ -830,13 +810,21 @@ class DatabaseService:
             Словарь с данными OAuth аккаунта или None, если аккаунт не найден
         """
         try:
-            query = "SELECT * FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?"
-            async with self.db.execute(query, (provider, provider_user_id)) as cursor:
-                account = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                account = await conn.fetchrow(
+                    "SELECT * FROM oauth_accounts WHERE provider = $1 AND provider_user_id = $2",
+                    provider,
+                    provider_user_id,
+                )
 
             return dict(account) if account else None
         except Exception as e:
-            logger.error(f"Ошибка при получении OAuth аккаунта: {str(e)}")
+            logger.error(
+                "Ошибка при получении OAuth аккаунта (provider=%s, id=%s): %s",
+                provider,
+                provider_user_id,
+                e,
+            )
             raise
 
     async def create_oauth_account(self, account_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -849,31 +837,19 @@ class DatabaseService:
         Returns:
             Словарь с данными созданного OAuth аккаунта
         """
-        fields = account_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        fields = list(account_data.keys())
+        placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO oauth_accounts ({fields_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO oauth_accounts ({fields_str}) VALUES ({placeholders}) RETURNING *"
 
         try:
-            await self.db.execute(query, list(account_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                account = await conn.fetchrow(query, *account_data.values())
 
-            # Получаем ID созданной записи
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                account_id = result["id"]
-
-            # Получаем полные данные OAuth аккаунта
-            async with self.db.execute(
-                "SELECT * FROM oauth_accounts WHERE id = ?", (account_id,)
-            ) as cursor:
-                account = await cursor.fetchone()
-
-            return dict(account)
+            return dict(account) if account else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании OAuth аккаунта: {str(e)}")
+            logger.error("Ошибка при создании OAuth аккаунта: %s", e)
             raise
 
     async def create_payment(self, payment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -886,31 +862,23 @@ class DatabaseService:
         Returns:
             Словарь с данными созданного платежа, включая ID
         """
-        fields = payment_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        fields = list(payment_data.keys())
+        placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO payments ({fields_str}) VALUES ({placeholders})"
+        query = f"""
+        INSERT INTO payments ({fields_str})
+        VALUES ({placeholders})
+        RETURNING *
+        """
 
         try:
-            await self.db.execute(query, list(payment_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                payment = await conn.fetchrow(query, *payment_data.values())
 
-            # Получаем ID созданного платежа
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                payment_id = result["id"]
-
-            # Получаем полные данные платежа
-            async with self.db.execute(
-                "SELECT * FROM payments WHERE id = ?", (payment_id,)
-            ) as cursor:
-                payment = await cursor.fetchone()
-
-            return dict(payment)
+            return dict(payment) if payment else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании платежа: {str(e)}")
+            logger.error("Ошибка при создании платежа: %s", e)
             raise
 
     async def update_payment(
@@ -929,37 +897,25 @@ class DatabaseService:
         if not payment_data:
             return None
 
-        set_parts = []
-        params = []
+        set_parts = [f"{key} = ${i+1}" for i, key in enumerate(payment_data.keys())]
+        set_parts.append(f"updated_at = ${len(set_parts) + 1}")
 
-        for key, value in payment_data.items():
-            set_parts.append(f"{key} = ?")
-            params.append(value)
+        query = f"""
+        UPDATE payments
+        SET {", ".join(set_parts)}
+        WHERE payment_id = ${len(set_parts) + 1}
+        RETURNING *
+        """
 
-        params.append(payment_id)
-        query = f"UPDATE payments SET {', '.join(set_parts)}, updated_at = ? WHERE payment_id = ?"
-
-        # Добавляем текущий timestamp
-        current_time = datetime.utcnow()
-        params.insert(-1, current_time)
+        params = list(payment_data.values()) + [datetime.utcnow(), payment_id]
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
-
-            if result.rowcount == 0:
-                return None
-
-            # Получаем обновленные данные
-            async with self.db.execute(
-                "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
-            ) as cursor:
-                updated_payment = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                updated_payment = await conn.fetchrow(query, *params)
 
             return dict(updated_payment) if updated_payment else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении платежа с ID {payment_id}: {str(e)}")
+            logger.error("Ошибка при обновлении платежа с ID %s: %s", payment_id, e)
             raise
 
     async def get_payment_by_id(self, payment_id: str) -> Optional[Dict[str, Any]]:
@@ -973,14 +929,14 @@ class DatabaseService:
             Словарь с данными платежа или None, если платеж не найден
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
-            ) as cursor:
-                payment = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                payment = await conn.fetchrow(
+                    "SELECT * FROM payments WHERE payment_id = $1", payment_id
+                )
 
             return dict(payment) if payment else None
         except Exception as e:
-            logger.error(f"Ошибка при получении платежа по ID {payment_id}: {str(e)}")
+            logger.error("Ошибка при получении платежа по ID %s: %s", payment_id, e)
             raise
 
     async def get_payments(
@@ -1002,34 +958,36 @@ class DatabaseService:
         Returns:
             Список словарей с данными платежей
         """
-        query_parts = ["SELECT * FROM payments WHERE 1=1"]
+        query_parts = ["SELECT * FROM payments"]
+        conditions = []
         params = []
 
         if status:
-            query_parts.append("AND status = ?")
+            conditions.append(f"status = ${len(params) + 1}")
             params.append(status)
 
         if payment_provider:
-            query_parts.append("AND payment_provider = ?")
+            conditions.append(f"payment_provider = ${len(params) + 1}")
             params.append(payment_provider)
 
-        query_parts.append("ORDER BY created_at DESC LIMIT ? OFFSET ?")
+        if conditions:
+            query_parts.append("WHERE " + " AND ".join(conditions))
+
+        query_parts.append(
+            f"ORDER BY created_at DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"
+        )
         params.extend([limit, skip])
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                payments = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
 
-            return payments
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка платежей: {str(e)}")
+            logger.error("Ошибка при получении списка платежей: %s", e)
             raise
-
-    # Добавьте эти методы в класс DatabaseService
-
-    # --- Методы для работы с планами подписок ---
 
     async def get_subscription_plans(
         self, skip: int = 0, limit: int = 100, active_only: bool = True
@@ -1045,25 +1003,29 @@ class DatabaseService:
         Returns:
             Список словарей с данными планов подписок
         """
-        query_parts = ["SELECT * FROM subscription_plans WHERE 1=1"]
+        query_parts = ["SELECT * FROM subscription_plans"]
+        conditions = []
         params = []
 
         if active_only:
-            query_parts.append("AND is_active = ?")
+            conditions.append(f"is_active = ${len(params) + 1}")
             params.append(True)
 
-        query_parts.append("ORDER BY price ASC LIMIT ? OFFSET ?")
+        if conditions:
+            query_parts.append("WHERE " + " AND ".join(conditions))
+
+        query_parts.append(f"ORDER BY price ASC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}")
         params.extend([limit, skip])
 
         query = " ".join(query_parts)
 
         try:
-            async with self.db.execute(query, params) as cursor:
-                plans = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
 
-            return plans
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка планов подписок: {str(e)}")
+            logger.error("Ошибка при получении списка подписок: %s", e)
             raise
 
     async def get_subscription_plan_by_id(self, plan_id: int) -> Optional[Dict[str, Any]]:
@@ -1074,17 +1036,17 @@ class DatabaseService:
             plan_id: ID плана подписки
 
         Returns:
-            Словарь с данными плана подписки или None, если план не найден
+            Словарь с данными плана подписки или None, если не найден
         """
-        try:
-            async with self.db.execute(
-                "SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)
-            ) as cursor:
-                plan = await cursor.fetchone()
+        query = "SELECT * FROM subscription_plans WHERE id = $1"
 
-            return dict(plan) if plan else None
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, plan_id)
+
+            return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении плана подписки по ID {plan_id}: {str(e)}")
+            logger.error("Ошибка при получении подписки по ID %s: %s", plan_id, e)
             raise
 
     async def create_subscription_plan(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1098,30 +1060,18 @@ class DatabaseService:
             Словарь с данными созданного плана подписки, включая ID
         """
         fields = plan_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        values_placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO subscription_plans ({fields_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO subscription_plans ({fields_str}) VALUES ({values_placeholders}) RETURNING *"
 
         try:
-            await self.db.execute(query, list(plan_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, *plan_data.values())
 
-            # Получаем ID созданного плана
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                plan_id = result["id"]
-
-            # Получаем полные данные плана
-            async with self.db.execute(
-                "SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)
-            ) as cursor:
-                plan_data = await cursor.fetchone()
-
-            return dict(plan_data)
+            return dict(row)
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании плана подписки: {str(e)}")
+            logger.error("Ошибка при создании подписки: %s", e)
             raise
 
     async def update_subscription_plan(
@@ -1143,32 +1093,26 @@ class DatabaseService:
         set_parts = []
         params = []
 
-        for key, value in plan_data.items():
-            set_parts.append(f"{key} = ?")
+        for i, (key, value) in enumerate(plan_data.items(), start=1):
+            set_parts.append(f"{key} = ${i}")
             params.append(value)
 
-        # Добавляем обновление updated_at
-        set_parts.append("updated_at = ?")
+        # Добавляем обновление `updated_at`
         params.append(datetime.utcnow())
+        set_parts.append(f"updated_at = ${len(params)}")
 
+        # Добавляем `plan_id` в параметры
         params.append(plan_id)
-        query = f"UPDATE subscription_plans SET {', '.join(set_parts)} WHERE id = ?"
+        query = f"UPDATE subscription_plans SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, *params)
 
-            if result.rowcount == 0:
-                return None
-
-            # Получаем обновленные данные
-            return await self.get_subscription_plan_by_id(plan_id)
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении плана подписки с ID {plan_id}: {str(e)}")
+            logger.error(f"Ошибка при обновлении подписки с ID {plan_id}: {e}")
             raise
-
-    # --- Методы для работы с подписками пользователей ---
 
     async def create_subscription(self, subscription_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1180,31 +1124,21 @@ class DatabaseService:
         Returns:
             Словарь с данными созданной подписки, включая ID
         """
-        fields = subscription_data.keys()
-        placeholders = ", ".join(["?"] * len(fields))
+        fields = list(subscription_data.keys())
+        values_placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
         fields_str = ", ".join(fields)
 
-        query = f"INSERT INTO subscriptions ({fields_str}) VALUES ({placeholders})"
+        query = (
+            f"INSERT INTO subscriptions ({fields_str}) VALUES ({values_placeholders}) RETURNING *"
+        )
 
         try:
-            await self.db.execute(query, list(subscription_data.values()))
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, *subscription_data.values())
 
-            # Получаем ID созданной подписки
-            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
-                result = await cursor.fetchone()
-                subscription_id = result["id"]
-
-            # Получаем полные данные подписки
-            async with self.db.execute(
-                "SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)
-            ) as cursor:
-                subscription_data = await cursor.fetchone()
-
-            return dict(subscription_data)
+            return dict(row)
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании подписки: {str(e)}")
+            logger.error(f"Ошибка при создании подписки: {e}")
             raise
 
     async def get_subscription_by_id(self, subscription_id: int) -> Optional[Dict[str, Any]]:
@@ -1218,14 +1152,14 @@ class DatabaseService:
             Словарь с данными подписки или None, если подписка не найдена
         """
         try:
-            async with self.db.execute(
-                "SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)
-            ) as cursor:
-                subscription = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT * FROM subscriptions WHERE id = $1", subscription_id
+                )
 
-            return dict(subscription) if subscription else None
+            return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении подписки по ID {subscription_id}: {str(e)}")
+            logger.error("Ошибка при получении подписки по ID %s: %s", subscription_id, str(e))
             raise
 
     async def get_user_subscription(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -1239,19 +1173,19 @@ class DatabaseService:
             Словарь с данными подписки или None, если активная подписка не найдена
         """
         try:
-            # Получаем самую последнюю активную подписку пользователя
             query = """
             SELECT * FROM subscriptions 
-            WHERE user_id = ? AND status = 'active' 
-            ORDER BY end_date DESC LIMIT 1
+            WHERE user_id = $1 AND status = 'active' 
+            ORDER BY end_date DESC 
+            LIMIT 1
             """
 
-            async with self.db.execute(query, (user_id,)) as cursor:
-                subscription = await cursor.fetchone()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, user_id)
 
-            return dict(subscription) if subscription else None
+            return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении подписки пользователя {user_id}: {str(e)}")
+            logger.error(f"Ошибка при получении подписки пользователя {user_id}: {e}")
             raise
 
     async def update_subscription(
@@ -1273,29 +1207,28 @@ class DatabaseService:
         set_parts = []
         params = []
 
-        for key, value in subscription_data.items():
-            set_parts.append(f"{key} = ?")
+        for i, (key, value) in enumerate(subscription_data.items(), start=1):
+            set_parts.append(f"{key} = ${i}")
             params.append(value)
 
         # Добавляем обновление updated_at
-        set_parts.append("updated_at = ?")
         params.append(datetime.utcnow())
+        set_parts.append(f"updated_at = ${len(params)}")
 
+        # Добавляем subscription_id
         params.append(subscription_id)
-        query = f"UPDATE subscriptions SET {', '.join(set_parts)} WHERE id = ?"
+
+        query = (
+            f"UPDATE subscriptions SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
+        )
 
         try:
-            result = await self.db.execute(query, params)
-            await self.db.commit()
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, *params)
 
-            if result.rowcount == 0:
-                return None
-
-            # Получаем обновленные данные
-            return await self.get_subscription_by_id(subscription_id)
+            return dict(row) if row else None
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Ошибка при обновлении подписки с ID {subscription_id}: {str(e)}")
+            logger.error(f"Ошибка при обновлении подписки с ID {subscription_id}: {e}")
             raise
 
     async def get_expiring_subscriptions(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
@@ -1309,25 +1242,23 @@ class DatabaseService:
             Список словарей с данными подписок
         """
         try:
-            # Вычисляем дату через days_threshold дней
             from datetime import timedelta
 
-            threshold_date = datetime.utcnow() + timedelta(days=days_threshold)
+            current_date = datetime.utcnow()
+            threshold_date = current_date + timedelta(days=days_threshold)
 
             query = """
             SELECT * FROM subscriptions 
-            WHERE status = 'active' AND end_date <= ? AND end_date >= ?
+            WHERE status = 'active' AND end_date <= $1 AND end_date >= $2
             ORDER BY end_date ASC
             """
 
-            current_date = datetime.utcnow()
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, threshold_date, current_date)
 
-            async with self.db.execute(query, (threshold_date, current_date)) as cursor:
-                subscriptions = [dict(row) for row in await cursor.fetchall()]
-
-            return subscriptions
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истекающих подписок: {str(e)}")
+            logger.error(f"Ошибка при получении истекающих подписок: {e}")
             raise
 
     async def get_expired_subscriptions(self) -> List[Dict[str, Any]]:
@@ -1342,16 +1273,16 @@ class DatabaseService:
 
             query = """
             SELECT * FROM subscriptions 
-            WHERE status = 'active' AND end_date < ?
+            WHERE status = 'active' AND end_date < $1
             ORDER BY end_date ASC
             """
 
-            async with self.db.execute(query, (current_date,)) as cursor:
-                subscriptions = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, current_date)
 
-            return subscriptions
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истекших подписок: {str(e)}")
+            logger.error(f"Ошибка при получении истекших подписок: {e}")
             raise
 
     async def get_subscriptions_for_renewal(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
@@ -1365,24 +1296,23 @@ class DatabaseService:
             Список словарей с данными подписок
         """
         try:
-            # Вычисляем дату через days_threshold дней
             from datetime import timedelta
 
-            threshold_date = datetime.utcnow() + timedelta(days=days_threshold)
             current_date = datetime.utcnow()
+            threshold_date = current_date + timedelta(days=days_threshold)
 
             query = """
             SELECT * FROM subscriptions 
-            WHERE status = 'active' AND auto_renew = ? AND end_date <= ? AND end_date >= ?
+            WHERE status = 'active' AND auto_renew = TRUE AND end_date <= $1 AND end_date >= $2
             ORDER BY end_date ASC
             """
 
-            async with self.db.execute(query, (True, threshold_date, current_date)) as cursor:
-                subscriptions = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, threshold_date, current_date)
 
-            return subscriptions
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении подписок для продления: {str(e)}")
+            logger.error(f"Ошибка при получении подписок для продления: {e}")
             raise
 
     async def get_user_subscriptions_history(
@@ -1401,15 +1331,15 @@ class DatabaseService:
         try:
             query = """
             SELECT * FROM subscriptions 
-            WHERE user_id = ? 
+            WHERE user_id = $1
             ORDER BY created_at DESC
-            LIMIT ?
+            LIMIT $2
             """
 
-            async with self.db.execute(query, (user_id, limit)) as cursor:
-                subscriptions = [dict(row) for row in await cursor.fetchall()]
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, user_id, limit)
 
-            return subscriptions
+            return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истории подписок пользователя {user_id}: {str(e)}")
+            logger.error(f"Ошибка при получении истории подписок пользователя {user_id}: {e}")
             raise

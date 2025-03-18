@@ -69,7 +69,7 @@ async def read_products(
     """
     Получение списка товаров с фильтрацией и сортировкой.
     """
-    logger.info(f"Получение списка товаров пользователем {current_user.username}")
+    logger.info("Получение списка товаров пользователем %s", current_user.username)
 
     try:
         products = await product_service.get_products(

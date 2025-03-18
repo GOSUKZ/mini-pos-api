@@ -31,23 +31,28 @@ logger = logging.getLogger("main")
 
 # Контекстный менеджер жизненного цикла приложения
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Код, выполняемый при запуске приложения
-    logger.info("Инициализация приложения")
-    await init_redis(app)
-    logger.info("Redis соединение установлено")
+async def lifespan(_app: FastAPI):
+    """
+    Manages the application lifespan, handling setup and teardown operations.
 
-    # Создаем базу данных
-    conn = await create_database(settings.DATABASE_NAME)
-    app.db = conn
+    Args:
+        app: The FastAPI application instance.
+    """
+    # Code executed during application startup
+    logger.info("Initializing application")
+    await init_redis(_app)  # Initialize Redis connection
+    logger.info("Redis connection established")
 
-    logger.info(f"База данных {settings.DATABASE_NAME} инициализирована")
+    # Create and initialize the database
+    _app.db_pool = await create_database()
 
-    yield
+    logger.info("Database initialized")
 
-    # Код, выполняемый при завершении приложения
-    await app.db.close()
-    logger.info("Соединение с базой данных закрыто")
+    yield  # Yield control back to the _application
+
+    # Code executed during _application shutdown
+    await _app.db_pool.close()  # Close the database connection
+    logger.info("Database connection closed")
 
 
 # Создаем экземпляр приложения

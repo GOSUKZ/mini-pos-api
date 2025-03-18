@@ -1,13 +1,15 @@
+import logging
+import os
 from datetime import datetime, timedelta
 from http.client import HTTPException
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
-from config import get_settings
+
 import httpx
 import jwt
 from passlib.context import CryptContext
-import logging
-import os
+
+from config import get_settings
 from core.database import DatabaseService
 
 logger = logging.getLogger("auth_service")
@@ -16,6 +18,7 @@ settings = get_settings()
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
 GOOGLE_REDIRECT_URI = settings.GOOGLE_REDIRECT_URI
@@ -80,15 +83,15 @@ class AuthService:
             user = await self.db_service.get_user_by_username(username)
 
             if not user:
-                logger.warning(f"Попытка аутентификации несуществующего пользователя: {username}")
+                logger.warning("Попытка аутентификации несуществующего пользователя: %s", username)
                 return None
 
             if not user.get("is_active", False):
-                logger.warning(f"Попытка аутентификации неактивного пользователя: {username}")
+                logger.warning("Попытка аутентификации неактивного пользователя: %s", username)
                 return None
 
             if not self.verify_password(password, user.get("hashed_password", "")):
-                logger.warning(f"Неверный пароль для пользователя: {username}")
+                logger.warning("Неверный пароль для пользователя: %s", username)
                 return None
 
             # Записываем в аудит успешный вход
@@ -322,7 +325,7 @@ class AuthService:
             raise HTTPException(status_code=400, detail="Email not provided by Google")
 
         # Найти пользователя в базе данных или создать нового
-        user = await self.get_user_by_email(email)
+        user = await self.db_service.get_user_by_email(email)
 
         if not user:
             # Создаем нового пользователя
@@ -333,10 +336,10 @@ class AuthService:
                 "is_verified": user_info.get("email_verified", False),
                 "auth_provider": "google",
             }
-            user = await self.create_user(new_user_data)
+            user = await self.db_service.create_user(new_user_data)
 
         # Генерация JWT токена
-        tokens = self.create_tokens({"user_id": str(user["id"]), "email": user["email"]})
+        tokens = self.db_service.create_tokens({"user_id": str(user["id"]), "email": user["email"]})
 
         return {
             "user": user,

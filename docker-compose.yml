@@ -1,20 +1,36 @@
 version: '3'
 
 services:
-  web:
-    build: .
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=sqlite:///./app.db  # Замените на свой URL базы данных
-      # Добавьте другие переменные окружения по необходимости
-    volumes:
-      - ./data:/app/data  # Для хранения данных
+    web:
+        build: .
+        restart: always
+        ports:
+            - '8000:8000'
+        env_file:
+            - .env
+        depends_on:
+            - postgres
+            - redis
+        volumes:
+            - ./data:/app/data # Для хранения данных
 
-  # Если используете Redis для лимитера
-  redis:
-    image: redis:alpine
-    restart: always
-    ports:
-      - "6379:6379"
+    postgres:
+        image: postgres:latest
+        restart: always
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=mypassword
+            - POSTGRES_DB=claude_data_shop
+        ports:
+            - '5432:5432'
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+
+    redis:
+        image: redis:alpine
+        restart: always
+        ports:
+            - '6379:6379'
+
+volumes:
+    postgres_data:
