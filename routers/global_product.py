@@ -1,16 +1,17 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
+"""
+This module contains the router for the global products.
+"""
+
 import logging
-from utils.dependencies import (
-    get_product_service,
-    get_current_active_user,
-    has_role,
-    can_read_products,
-)
-from services.product_service import ProductService
-from core.models import Product, ProductCreate, ProductUpdate, User
-from core.dtos.product_response_dto import ProductResponseDTO
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi_cache.decorator import cache
+
+from core.dtos.product_response_dto import ProductResponseDTO
+from core.models import Product, ProductCreate, ProductUpdate, User
+from services.product_service import ProductService
+from utils.dependencies import get_current_active_user, get_product_service, has_role
 
 logger = logging.getLogger("product_router")
 
@@ -31,7 +32,7 @@ async def read_product_by_barcode(
     """
     Получение товара по штрих-коду.
     """
-    logger.info(f"Поиск товара по штрих-коду {barcode} пользователем {current_user.username}")
+    logger.info("Поиск товара по штрих-коду %s пользователем %s", barcode, current_user.username)
 
     try:
         product = await product_service.get_product_by_barcode(
@@ -45,7 +46,7 @@ async def read_product_by_barcode(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка при поиске товара по штрих-коду {barcode}: {str(e)}")
+        logger.error("Ошибка при поиске товара по штрих-коду %s: %s", barcode, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -63,7 +64,7 @@ async def read_products(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(can_read_products),
+    current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
     Получение списка товаров с фильтрацией и сортировкой.
@@ -124,7 +125,7 @@ async def create_product(
 async def read_product(
     product_id: int = Path(..., ge=1),
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
     Получение товара по ID.

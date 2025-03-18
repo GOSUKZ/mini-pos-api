@@ -308,7 +308,28 @@ class DatabaseService:
 
             return dict(product) if product else None
         except Exception as e:
-            logger.error(f"Ошибка при получении товара по ID {product_id}: {str(e)}")
+            logger.error("Ошибка при получении товара по ID %s: %s", product_id, str(e))
+            raise
+
+    async def get_local_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получает товар по ID.
+
+        Args:
+            product_id: ID товара
+
+        Returns:
+            Словарь с данными товара или None, если товар не найден
+        """
+        try:
+            async with self.db.execute(
+                "SELECT * FROM local_products WHERE id = ?", (product_id,)
+            ) as cursor:
+                product = await cursor.fetchone()
+
+            return dict(product) if product else None
+        except Exception as e:
+            logger.error("Ошибка при получении товара по ID %s: %s", product_id, str(e))
             raise
 
     async def get_product_by_sku(self, sku_code: str) -> Optional[Dict[str, Any]]:
@@ -330,6 +351,30 @@ class DatabaseService:
             return dict(product) if product else None
         except Exception as e:
             logger.error(f"Ошибка при получении товара по SKU {sku_code}: {str(e)}")
+            raise
+
+    async def get_local_product_by_sku(
+        self, sku_code: str, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получает товар по SKU коду.
+
+        Args:
+            sku_code: SKU код товара
+
+        Returns:
+            Словарь с данными товара или None, если товар не найден
+        """
+        try:
+            async with self.db.execute(
+                "SELECT * FROM local_products WHERE user_id = ? AND sku_code = ?",
+                (user_id, sku_code),
+            ) as cursor:
+                product = await cursor.fetchone()
+
+            return dict(product) if product else None
+        except Exception as e:
+            logger.error("Ошибка при получении товара по SKU %s: %s", sku_code, str(e))
             raise
 
     async def create_product(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -367,6 +412,46 @@ class DatabaseService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Ошибка при создании товара: {str(e)}")
+            raise
+
+    async def create_local_product(
+        self, product_data: Dict[str, Any], user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Создает новый товар.
+
+        Args:
+            product_data: Словарь с данными товара
+
+        Returns:
+            Словарь с данными созданного товара, включая ID
+        """
+        product_data["user_id"] = user_id
+        fields = product_data.keys()
+        placeholders = ", ".join(["?"] * len(fields))
+        fields_str = ", ".join(fields)
+
+        query = f"INSERT INTO local_products ({fields_str}) VALUES ({placeholders})"
+
+        try:
+            await self.db.execute(query, list(product_data.values()))
+            await self.db.commit()
+
+            # Получаем ID созданного товара
+            async with self.db.execute("SELECT last_insert_rowid() as id") as cursor:
+                result = await cursor.fetchone()
+                product_id = result["id"]
+
+            # Получаем полные данные продукта
+            async with self.db.execute(
+                "SELECT * FROM local_products WHERE id = ?", (product_id,)
+            ) as cursor:
+                product_data = await cursor.fetchone()
+
+            return dict(product_data)
+        except Exception as e:
+            await self.db.rollback()
+            logger.error("Ошибка при создании товара: %s", str(e))
             raise
 
     async def update_product(
@@ -414,6 +499,51 @@ class DatabaseService:
             logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
             raise
 
+    async def update_local_product(
+        self, product_id: int, product_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Обновляет данные товара.
+
+        Args:
+            product_id: ID товара
+            product_data: Словарь с обновляемыми данными товара
+
+        Returns:
+            Словарь с обновленными данными товара или None, если товар не найден
+        """
+        if not product_data:
+            return await self.get_product_by_id(product_id)
+
+        set_parts = []
+        params = []
+
+        for key, value in product_data.items():
+            set_parts.append(f"{key} = ?")
+            params.append(value)
+
+        params.append(product_id)
+        query = f"UPDATE local_products SET {', '.join(set_parts)} WHERE id = ?"
+
+        try:
+            result = await self.db.execute(query, params)
+            await self.db.commit()
+
+            if result.rowcount == 0:
+                return None
+
+            # Получаем обновленные данные
+            async with self.db.execute(
+                "SELECT * FROM local_products WHERE id = ?", (product_id,)
+            ) as cursor:
+                updated_product = await cursor.fetchone()
+
+            return dict(updated_product) if updated_product else None
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+            raise
+
     async def delete_product(self, product_id: int) -> bool:
         """
         Удаляет товар.
@@ -431,7 +561,27 @@ class DatabaseService:
             return result.rowcount > 0
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
+            raise
+
+    async def delete_local_product(self, product_id: int) -> bool:
+        """
+        Удаляет товар.
+
+        Args:
+            product_id: ID товара
+
+        Returns:
+            True, если товар успешно удален, иначе False
+        """
+        try:
+            result = await self.db.execute("DELETE FROM local_products WHERE id = ?", (product_id,))
+            await self.db.commit()
+
+            return result.rowcount > 0
+        except Exception as e:
+            await self.db.rollback()
+            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
             raise
 
     async def add_audit_log(

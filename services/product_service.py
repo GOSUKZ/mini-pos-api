@@ -151,7 +151,7 @@ class ProductService:
 
             return product
         except Exception as e:
-            logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при получении товара с ID %s: %s", product_id, str(e))
             raise
 
     async def create_product(
@@ -196,7 +196,7 @@ class ProductService:
 
             return product
         except Exception as e:
-            logger.error(f"Ошибка при создании товара: {str(e)}")
+            logger.error("Ошибка при создании товара: {%s}", str(e))
             raise
 
     async def update_product(
@@ -252,7 +252,7 @@ class ProductService:
 
             return updated_product
         except Exception as e:
-            logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
             raise
 
     async def delete_product(self, product_id: int, current_user: Dict[str, Any] = None) -> bool:
@@ -360,22 +360,21 @@ class ProductService:
             logger.error("Ошибка при получении локальных продуктов: %s", str(e))
             raise
 
-    async def get_local_product(self, product_id: int, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_local_product(self, product_id: int) -> Optional[Dict[str, Any]]:
         """
         Получает локальный продукт по ID.
 
         Args:
             product_id: ID локального продукта
-            user_id: ID пользователя
 
         Returns:
             Словарь с данными продукта или None, если продукт не найден
         """
         try:
-            product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            product = await self.db_service.get_local_product_by_id(product_id)
             return product
         except Exception as e:
-            logger.error(f"Ошибка при получении локального продукта {product_id}: {str(e)}")
+            logger.error("Ошибка при получении локального продукта %s: %s", product_id, str(e))
             raise
 
     async def create_local_product(
@@ -392,70 +391,90 @@ class ProductService:
             Словарь с данными созданного продукта
         """
         try:
-            # Проверка уникальности SKU среди локальных продуктов пользователя
+            # Проверяем уникальность SKU
             existing_product = await self.db_service.get_local_product_by_sku(
-                user_id, product_data.get("sku_code", "")
+                product_data.get("sku_code", ""), user_id=user_id
             )
             if existing_product:
-                raise ValueError(
-                    f"Local product with SKU '{product_data.get('sku_code')}' already exists"
-                )
+                raise ValueError(f"Продукт с СКУ '{product_data.get('sku_code')}' уже существует")
 
-            # Проверка бизнес-логики
+            # Проверяем бизнес-правила
             self._validate_product_data(product_data)
 
+            # Создаем товар
             product = await self.db_service.create_local_product(product_data, user_id)
+
+            # Добавляем аудит
+            await self.db_service.add_audit_log(
+                action="create",
+                entity="product",
+                entity_id=str(product.get("id", "")),
+                user_id=user_id,
+                details=f"Created product: {product.get('sku_name', '')}",
+            )
 
             return product
         except Exception as e:
-            logger.error(f"Ошибка при создании локального продукта: {str(e)}")
+            logger.error("Ошибка при создании товара: {%s}", str(e))
             raise
 
     async def update_local_product(
-        self, product_id: int, product_data: Dict[str, Any], user_id: str
+        self, product_id: int, product_data: Dict[str, Any], current_user: Dict[str, Any] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Обновляет локальный продукт.
+        Обновляет данные товара с проверкой бизнес-правил.
+        Добавляет запись в лог аудита.
 
         Args:
-            product_id: ID локального продукта
-            product_data: Данные для обновления
-            user_id: ID пользователя
+            product_id: ID товара
+            product_data: Словарь с обновляемыми данными товара
+            current_user: Данные текущего пользователя для аудита
 
         Returns:
-            Обновленные данные продукта или None, если продукт не найден
+            Словарь с обновленными данными товара или None, если товар не найден
         """
         try:
-            existing_product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            # Получаем текущие данные товара
+            existing_product = await self.db_service.get_local_product_by_id(product_id)
             if not existing_product:
                 return None
 
-            # Проверка уникальности SKU, если он изменяется
+            # Проверяем уникальность SKU, если он изменяется
             if (
                 "sku_code" in product_data
                 and product_data["sku_code"] != existing_product["sku_code"]
             ):
-                sku_product = await self.db_service.get_local_product_by_sku(
-                    user_id, product_data["sku_code"]
-                )
+                sku_product = await self.db_service.get_product_by_sku(product_data["sku_code"])
                 if sku_product and sku_product["id"] != product_id:
                     raise ValueError(
-                        f"Local product with SKU '{product_data['sku_code']}' already exists"
+                        f"Product with SKU code '{product_data['sku_code']}' already exists"
                     )
 
+            # Объединяем существующие и новые данные для валидации
             merged_data = {**existing_product, **product_data}
+
+            # Проверяем бизнес-правила
             self._validate_product_data(merged_data)
 
-            updated_product = await self.db_service.update_local_product(
-                product_id, product_data, user_id
-            )
+            # Обновляем товар
+            updated_product = await self.db_service.update_local_product(product_id, product_data)
+
+            # Добавляем аудит
+            if updated_product and current_user:
+                await self.db_service.add_audit_log(
+                    action="update",
+                    entity="product",
+                    entity_id=str(product_id),
+                    user_id=current_user.get("username", "unknown"),
+                    details=f"Updated product: {updated_product.get('sku_name', '')}, fields: {', '.join(product_data.keys())}",
+                )
 
             return updated_product
         except Exception as e:
-            logger.error(f"Ошибка при обновлении локального продукта {product_id}: {str(e)}")
+            logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
             raise
 
-    async def delete_local_product(self, product_id: int, user_id: str) -> bool:
+    async def delete_local_product(self, product_id: int) -> bool:
         """
         Удаляет локальный продукт.
 
@@ -467,14 +486,14 @@ class ProductService:
             True, если продукт удален, иначе False
         """
         try:
-            product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            product = await self.db_service.get_local_product_by_id(product_id)
             if not product:
                 return False
 
-            result = await self.db_service.delete_local_product(product_id, user_id)
+            result = await self.db_service.delete_local_product(product_id)
             return result
         except Exception as e:
-            logger.error(f"Ошибка при удалении локального продукта {product_id}: {str(e)}")
+            logger.error("Ошибка при удалении локального продукта %s: %s", product_id, str(e))
             raise
 
     def _validate_product_data(self, product_data: Dict[str, Any]) -> None:

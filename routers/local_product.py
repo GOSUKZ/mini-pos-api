@@ -1,17 +1,44 @@
+"""
+Модуль маршрутов для управления локальными товарами.
+
+Этот модуль определяет API-эндпоинты для работы с локальными товарами,
+включая их получение, создание, обновление и удаление.
+Реализована поддержка фильтрации, сортировки и пагинации.
+
+Маршруты:
+- `GET /products/local/` — получение списка товаров с фильтрацией и сортировкой.
+- `POST /products/local/` — создание нового товара (требуются права администратора или менеджера).
+- `GET /products/local/{product_id}` — получение товара по ID.
+- `PUT /products/local/{product_id}` — обновление товара по ID (требуются права администратора или менеджера).
+- `DELETE /products/local/{product_id}` — удаление товара по ID (требуются права администратора).
+
+Авторизация:
+- Для выполнения большинства операций требуется проверка прав доступа (через зависимости `can_read_products` и `has_role`).
+
+Зависимости:
+- `ProductService` — сервис для работы с товарами.
+- `User` — модель пользователя, извлекаемая через зависимости.
+
+Логирование:
+- Включено логирование всех ключевых операций с товарами.
+- Используется именованный логгер `local_product_router`.
+
+Ошибки:
+- `400 Bad Request` — некорректные параметры запроса.
+- `404 Not Found` — товар не найден.
+- `500 Internal Server Error` — внутренняя ошибка сервера.
+
+"""
+
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User
 from services.product_service import ProductService
-from utils.dependencies import (
-    can_read_products,
-    get_current_active_user,
-    get_product_service,
-    has_role,
-)
+from utils.dependencies import can_read_products, get_product_service
 
 logger = logging.getLogger("local_product_router")
 
@@ -70,24 +97,24 @@ async def read_products(
 async def create_product(
     product: ProductCreate,
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(has_role(["admin", "manager"])),
+    current_user: User = Depends(can_read_products),
 ):
     """
     Создание нового товара.
     Требуются права администратора или менеджера.
     """
-    logger.info(f"Создание товара пользователем {current_user.username}")
+    logger.info("Создание товара пользователем %s", current_user.username)
 
     try:
-        created_product = await product_service.create_product(
-            product_data=product.model_dump(), current_user=current_user.model_dump()
+        created_product = await product_service.create_local_product(
+            product_data=product.model_dump(), user_id=current_user.id
         )
 
         return created_product
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при создании товара: {str(e)}")
+        logger.error("Ошибка при создании товара: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -97,24 +124,25 @@ async def create_product(
 async def read_product(
     product_id: int = Path(..., ge=1),
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(can_read_products),
 ):
     """
     Получение товара по ID.
     """
-    logger.info(f"Получение товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await product_service.get_product(
-            product_id=product_id, current_user=current_user.model_dump()
-        )
+        product = await product_service.get_local_product(product_id=product_id)
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
+        if product.get("user_id") != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
         return product
     except Exception as e:
-        logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при получении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -125,16 +153,23 @@ async def update_product(
     product_id: int = Path(..., ge=1),
     product_update: ProductUpdate = ...,
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(has_role(["admin", "manager"])),
+    current_user: User = Depends(can_read_products),
 ):
     """
     Обновление товара по ID.
-    Требуются права администратора или менеджера.
     """
-    logger.info(f"Обновление товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        updated_product = await product_service.update_product(
+        product = await product_service.get_local_product(product_id=product_id)
+
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+        if product.get("user_id") != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+        updated_product = await product_service.update_local_product(
             product_id=product_id,
             product_data=product_update.model_dump(exclude_unset=True),
             current_user=current_user.model_dump(),
@@ -147,35 +182,53 @@ async def update_product(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{product_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_product(
     product_id: int = Path(..., ge=1),
     product_service: ProductService = Depends(get_product_service),
-    current_user: User = Depends(has_role(["admin"])),
+    current_user: User = Depends(can_read_products),
 ):
     """
     Удаление товара по ID.
     Требуются права администратора.
     """
-    logger.info(f"Удаление товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        result = await product_service.delete_product(
-            product_id=product_id, current_user=current_user.model_dump()
+        product = await product_service.get_local_product(product_id=product_id)
+    except Exception as e:
+        logger.error("Ошибка при поиске товара с ID %s: %s", product_id, str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error"
         )
 
+    if not product:
+        logger.info("Товар с ID %s не найден", product_id)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if product.get("user_id") != current_user.id:
+        logger.warning("Попытка удалить чужой товар: %s", product_id)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    try:
+        result = await product_service.delete_local_product(product_id=product_id)
+
         if not result:
+            logger.info("Не удалось удалить товар с ID %s, возможно, он уже удален", product_id)
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
         return None
     except Exception as e:
-        logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
