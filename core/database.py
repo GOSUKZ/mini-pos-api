@@ -5,6 +5,7 @@ from datetime import datetime
 
 logger = logging.getLogger("database_service")
 
+
 class DatabaseService:
     """
     Сервисный слой для работы с базой данных.
@@ -29,7 +30,7 @@ class DatabaseService:
         sort_order: str = "asc",
         department: Optional[str] = None,
         min_price: Optional[float] = None,
-        max_price: Optional[float] = None
+        max_price: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает список товаров с учетом параметров фильтрации и сортировки.
@@ -90,6 +91,55 @@ class DatabaseService:
             logger.error(f"Ошибка при получении списка товаров: {str(e)}")
             raise
 
+    async def get_products_count(
+        self,
+        search: Optional[str] = None,
+        department: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+    ) -> int:
+        """
+        Получает общее количество товаров с учетом фильтрации.
+
+        Args:
+            search: Строка поиска
+            department: Фильтр по отделу
+            min_price: Минимальная цена
+            max_price: Максимальная цена
+
+        Returns:
+            Общее количество товаров
+        """
+        query_parts = ["SELECT COUNT(*) FROM products WHERE 1=1"]
+        params = []
+
+        if search:
+            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term, search_term])
+
+        if department:
+            query_parts.append("AND department = ?")
+            params.append(department)
+
+        if min_price is not None:
+            query_parts.append("AND price >= ?")
+            params.append(min_price)
+
+        if max_price is not None:
+            query_parts.append("AND price <= ?")
+            params.append(max_price)
+
+        query = " ".join(query_parts)
+
+        try:
+            async with self.db.execute(query, params) as cursor:
+                total_count = await cursor.fetchone()
+                return total_count[0] if total_count else 0
+        except Exception as e:
+            logger.error(f"Ошибка при получении количества товаров: {str(e)}")
+            raise
+
     async def get_product_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
         """
         Получение товара по штрих-коду.
@@ -101,10 +151,7 @@ class DatabaseService:
             Информация о товаре или None, если товар не найден
         """
         try:
-            async with self.db.execute(
-                    "SELECT * FROM products WHERE barcode = ?",
-                    (barcode,)
-            ) as cursor:
+            async with self.db.execute("SELECT * FROM products WHERE barcode = ?", (barcode,)) as cursor:
                 result = await cursor.fetchone()
 
                 if result:
@@ -114,6 +161,7 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Ошибка при получении товара по штрих-коду из БД: {str(e)}")
             raise
+
     async def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
         """
         Получает товар по ID.
@@ -248,14 +296,7 @@ class DatabaseService:
             logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
             raise
 
-    async def add_audit_log(
-        self,
-        action: str,
-        entity: str,
-        entity_id: str,
-        user_id: str,
-        details: str = ""
-    ) -> int:
+    async def add_audit_log(self, action: str, entity: str, entity_id: str, user_id: str, details: str = "") -> int:
         """
         Добавляет запись в лог аудита.
 
@@ -297,7 +338,7 @@ class DatabaseService:
         action: Optional[str] = None,
         user_id: Optional[str] = None,
         from_date: Optional[str] = None,
-        to_date: Optional[str] = None
+        to_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает записи из лога аудита с учетом параметров фильтрации.
@@ -635,11 +676,7 @@ class DatabaseService:
             raise
 
     async def get_payments(
-            self,
-            skip: int = 0,
-            limit: int = 100,
-            status: Optional[str] = None,
-            payment_provider: Optional[str] = None
+        self, skip: int = 0, limit: int = 100, status: Optional[str] = None, payment_provider: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Получает список платежей с учетом параметров фильтрации.
@@ -683,10 +720,7 @@ class DatabaseService:
     # --- Методы для работы с планами подписок ---
 
     async def get_subscription_plans(
-            self,
-            skip: int = 0,
-            limit: int = 100,
-            active_only: bool = True
+        self, skip: int = 0, limit: int = 100, active_only: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Получает список планов подписок.
@@ -898,8 +932,9 @@ class DatabaseService:
             logger.error(f"Ошибка при получении подписки пользователя {user_id}: {str(e)}")
             raise
 
-    async def update_subscription(self, subscription_id: int, subscription_data: Dict[str, Any]) -> Optional[
-        Dict[str, Any]]:
+    async def update_subscription(
+        self, subscription_id: int, subscription_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные подписки.
 
@@ -954,6 +989,7 @@ class DatabaseService:
         try:
             # Вычисляем дату через days_threshold дней
             from datetime import timedelta
+
             threshold_date = datetime.utcnow() + timedelta(days=days_threshold)
 
             query = """
@@ -1009,6 +1045,7 @@ class DatabaseService:
         try:
             # Вычисляем дату через days_threshold дней
             from datetime import timedelta
+
             threshold_date = datetime.utcnow() + timedelta(days=days_threshold)
             current_date = datetime.utcnow()
 

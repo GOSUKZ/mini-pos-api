@@ -1,13 +1,18 @@
+import redis.asyncio as redis
 import os
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Dict, List, Optional, Any, ClassVar
+from fastapi import FastAPI
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
 
 
 class Settings(BaseSettings):
     """
     Настройки приложения, загружаемые из переменных окружения.
     """
+
     # Базовые настройки приложения
     APP_NAME: str = "Products API"
     APP_VERSION: str = "1.0.0"
@@ -38,6 +43,9 @@ class Settings(BaseSettings):
     GOOGLE_TOKEN_URL: Optional[str] = os.getenv("GOOGLE_TOKEN_URL")
     GOOGLE_USER_INFO_URL: Optional[str] = os.getenv("GOOGLE_USER_INFO_URL")
 
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: str = os.getenv("REDIS_PORT", "6379")
+
     # Логирование
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -58,3 +66,10 @@ def get_settings() -> Settings:
         Экземпляр настроек
     """
     return Settings()
+
+
+async def init_redis(app: FastAPI):
+    settings = get_settings()
+    redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}"
+    redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+    FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache")

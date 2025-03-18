@@ -4,6 +4,7 @@ from core.database import DatabaseService
 
 logger = logging.getLogger("product_service")
 
+
 class ProductService:
     """
     Сервисный слой для работы с товарами.
@@ -42,13 +43,14 @@ class ProductService:
                 entity="product",
                 entity_id=str(product.get("id", "")),
                 user_id=current_user.get("username", ""),
-                details=f"Get product by barcode: {barcode}"
+                details=f"Get product by barcode: {barcode}",
             )
 
             return product
         except Exception as e:
             logger.error(f"Ошибка при получении товара по штрих-коду {barcode}: {str(e)}")
             raise
+
     async def get_products(
         self,
         skip: int = 0,
@@ -59,8 +61,8 @@ class ProductService:
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        current_user: Dict[str, Any] = None
-    ) -> List[Dict[str, Any]]:
+        current_user: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
         """
         Получает список товаров с учетом параметров фильтрации и сортировки.
         Добавляет запись в лог аудита.
@@ -70,9 +72,13 @@ class ProductService:
             current_user: Данные текущего пользователя для аудита
 
         Returns:
-            Список словарей с данными товаров
+            Словарь с метаинформацией и списком товаров
         """
         try:
+            total_count = await self.db_service.get_products_count(
+                search=search, department=department, min_price=min_price, max_price=max_price
+            )
+
             products = await self.db_service.get_products(
                 skip=skip,
                 limit=limit,
@@ -81,29 +87,40 @@ class ProductService:
                 sort_order=sort_order,
                 department=department,
                 min_price=min_price,
-                max_price=max_price
+                max_price=max_price,
             )
 
-            # Добавляем аудит при получении списка товаров
+            current_page = (skip // limit) + 1 if limit > 0 else 1
+            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+            is_last = current_page >= total_pages
+
+            response = {
+                "total_count": total_count,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "skip": skip,
+                "is_last": is_last,
+                "content": products,
+            }
+
+            # Добавляем аудит
             if current_user:
                 await self.db_service.add_audit_log(
                     action="read",
                     entity="products",
                     entity_id="list",
                     user_id=current_user.get("username", "unknown"),
-                    details=f"Retrieved products list with params: limit={limit}, skip={skip}"
+                    details=f"Retrieved products list with params: limit={limit}, skip={skip}",
                 )
 
-            return products
+            return response
+
         except Exception as e:
             logger.error(f"Ошибка при получении списка товаров: {str(e)}")
             raise
 
-    async def get_product(
-        self,
-        product_id: int,
-        current_user: Dict[str, Any] = None
-    ) -> Optional[Dict[str, Any]]:
+    async def get_product(self, product_id: int, current_user: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """
         Получает товар по ID.
         Добавляет запись в лог аудита.
@@ -124,7 +141,7 @@ class ProductService:
                     entity="product",
                     entity_id=str(product_id),
                     user_id=current_user.get("username", "unknown"),
-                    details=f"Retrieved product: {product.get('sku_name', '')}"
+                    details=f"Retrieved product: {product.get('sku_name', '')}",
                 )
 
             return product
@@ -132,11 +149,7 @@ class ProductService:
             logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
             raise
 
-    async def create_product(
-        self,
-        product_data: Dict[str, Any],
-        current_user: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    async def create_product(self, product_data: Dict[str, Any], current_user: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Создает новый товар с проверкой бизнес-правил.
         Добавляет запись в лог аудита.
@@ -167,7 +180,7 @@ class ProductService:
                     entity="product",
                     entity_id=str(product.get("id", "")),
                     user_id=current_user.get("username", "unknown"),
-                    details=f"Created product: {product.get('sku_name', '')}"
+                    details=f"Created product: {product.get('sku_name', '')}",
                 )
 
             return product
@@ -176,10 +189,7 @@ class ProductService:
             raise
 
     async def update_product(
-        self,
-        product_id: int,
-        product_data: Dict[str, Any],
-        current_user: Dict[str, Any] = None
+        self, product_id: int, product_data: Dict[str, Any], current_user: Dict[str, Any] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные товара с проверкой бизнес-правил.
@@ -221,7 +231,7 @@ class ProductService:
                     entity="product",
                     entity_id=str(product_id),
                     user_id=current_user.get("username", "unknown"),
-                    details=f"Updated product: {updated_product.get('sku_name', '')}, fields: {', '.join(product_data.keys())}"
+                    details=f"Updated product: {updated_product.get('sku_name', '')}, fields: {', '.join(product_data.keys())}",
                 )
 
             return updated_product
@@ -229,11 +239,7 @@ class ProductService:
             logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
             raise
 
-    async def delete_product(
-        self,
-        product_id: int,
-        current_user: Dict[str, Any] = None
-    ) -> bool:
+    async def delete_product(self, product_id: int, current_user: Dict[str, Any] = None) -> bool:
         """
         Удаляет товар.
         Добавляет запись в лог аудита.
@@ -263,7 +269,7 @@ class ProductService:
                     entity="product",
                     entity_id=str(product_id),
                     user_id=current_user.get("username", "unknown"),
-                    details=f"Deleted product: {product_name}"
+                    details=f"Deleted product: {product_name}",
                 )
 
             return result

@@ -5,8 +5,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.exceptions import RequestValidationError
-import aiosqlite
 import time
+from config import init_redis
 
 from core.init_db import create_database
 from routers.payment import router as payment_router
@@ -16,7 +16,8 @@ from routers.payment import router as payment_router
 from config import get_settings
 
 # Импортируем роутеры
-from routers import product, auth, audit, user
+from routers import global_product, auth, audit, user, local_product, metrics
+from routers.metrics import increment_metric
 
 # Инициализируем настройки
 settings = get_settings()
@@ -25,13 +26,9 @@ settings = get_settings()
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL),
     format=settings.LOG_FORMAT,
-    handlers=[
-        logging.FileHandler(settings.LOG_FILE),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.FileHandler(settings.LOG_FILE), logging.StreamHandler()],
 )
 logger = logging.getLogger("main")
-
 
 
 # Контекстный менеджер жизненного цикла приложения
@@ -39,6 +36,8 @@ logger = logging.getLogger("main")
 async def lifespan(app: FastAPI):
     # Код, выполняемый при запуске приложения
     logger.info("Инициализация приложения")
+    await init_redis(app)
+    logger.info("Redis соединение установлено")
 
     # Создаем базу данных
     conn = await create_database(settings.DATABASE_NAME)
@@ -52,40 +51,43 @@ async def lifespan(app: FastAPI):
     await app.db.close()
     logger.info("Соединение с базой данных закрыто")
 
+
 # Создаем экземпляр приложения
 app = FastAPI(
     title=settings.APP_NAME,
     description="API для управления товарами с использованием FastAPI и Pydantic 2",
     version=settings.APP_VERSION,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 # Middleware для измерения времени выполнения запросов
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
+async def custom_middleware(request: Request, call_next):
+    """Миддлвар для подсчета вызовов API и измерения времени обработки запроса."""
     start_time = time.time()
+
     response = await call_next(request)
+
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
+
+    await increment_metric(request.url.path)  # Увеличиваем счетчик вызовов
+
     return response
+
 
 # Обработчик ошибок валидации
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     error_details = []
     for error in exc.errors():
-        error_details.append({
-            "loc": error.get("loc", []),
-            "msg": error.get("msg", ""),
-            "type": error.get("type", "")
-        })
+        error_details.append({"loc": error.get("loc", []), "msg": error.get("msg", ""), "type": error.get("type", "")})
 
     logger.warning(f"Ошибка валидации: {error_details}")
 
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": error_details}
-    )
+    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": error_details})
+
 
 # Настройка CORS
 app.add_middleware(
@@ -102,16 +104,19 @@ if not settings.DEBUG:
     # В тестовом режиме мы не ограничиваем хосты
     # В боевом режиме ограничиваем доступными хостами
     app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", "testserver"]  # Добавляем testserver для тестов
+        TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"]  # Добавляем testserver для тестов
     )
 
 # Подключаем роутеры
 app.include_router(auth.router)
-app.include_router(product.router)
+app.include_router(global_product.router)
+app.include_router(local_product.router)
 app.include_router(audit.router)
 app.include_router(user.router)
 app.include_router(payment_router)
+app.include_router(metrics.router)
+
+
 # Корневой эндпоинт
 @app.get("/", tags=["root"])
 async def root():
@@ -119,15 +124,12 @@ async def root():
         "message": "Welcome to the Products API",
         "version": settings.APP_VERSION,
         "docs_url": "/docs",
-        "redoc_url": "/redoc"
+        "redoc_url": "/redoc",
     }
+
 
 # Запуск приложения (для разработки)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG)
