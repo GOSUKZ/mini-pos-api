@@ -1,5 +1,11 @@
+"""
+Core database module.
+
+This module provides a service for working with the database.
+"""
+
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import asyncpg
@@ -101,7 +107,7 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка товаров: {e}")
+            logger.error("Ошибка при получении списка товаров: %s", e)
             raise
 
     async def get_local_products(
@@ -187,7 +193,7 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении списка товаров: {e}")
+            logger.error("Ошибка при получении списка товаров: %s", e)
             raise
 
     async def get_products_count(
@@ -243,7 +249,7 @@ class DatabaseService:
                 result = await conn.fetchval(query, *params)
             return result if result else 0
         except Exception as e:
-            logger.error(f"Ошибка при получении количества товаров: {e}")
+            logger.error("Ошибка при получении количества товаров: %s", e)
             raise
 
     async def get_local_products_count(
@@ -301,7 +307,7 @@ class DatabaseService:
                 result = await conn.fetchval(query, *params)
             return result if result else 0
         except Exception as e:
-            logger.error(f"Ошибка при получении количества товаров: {e}")
+            logger.error("Ошибка при получении количества товаров: %s", e)
             raise
 
     async def get_product_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
@@ -581,8 +587,6 @@ class DatabaseService:
         except Exception as e:
             logger.error("Ошибка при удалении локального товара с ID %s: %s", product_id, e)
             raise
-
-    from datetime import datetime
 
     async def add_audit_log(
         self, action: str, entity: str, entity_id: str, user_id: str, details: str = ""
@@ -1111,7 +1115,7 @@ class DatabaseService:
 
             return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при обновлении подписки с ID {plan_id}: {e}")
+            logger.error("Ошибка при обновлении подписки с ID %s: %s", plan_id, e)
             raise
 
     async def create_subscription(self, subscription_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1138,7 +1142,7 @@ class DatabaseService:
 
             return dict(row)
         except Exception as e:
-            logger.error(f"Ошибка при создании подписки: {e}")
+            logger.error("Ошибка при создании подписки: %s", e)
             raise
 
     async def get_subscription_by_id(self, subscription_id: int) -> Optional[Dict[str, Any]]:
@@ -1185,7 +1189,7 @@ class DatabaseService:
 
             return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при получении подписки пользователя {user_id}: {e}")
+            logger.error("Ошибка при получении подписки пользователя %s: %s", user_id, e)
             raise
 
     async def update_subscription(
@@ -1228,7 +1232,7 @@ class DatabaseService:
 
             return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Ошибка при обновлении подписки с ID {subscription_id}: {e}")
+            logger.error("Ошибка при обновлении подписки с ID %s: %s", subscription_id, e)
             raise
 
     async def get_expiring_subscriptions(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
@@ -1242,7 +1246,6 @@ class DatabaseService:
             Список словарей с данными подписок
         """
         try:
-            from datetime import timedelta
 
             current_date = datetime.utcnow()
             threshold_date = current_date + timedelta(days=days_threshold)
@@ -1258,7 +1261,7 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истекающих подписок: {e}")
+            logger.error("Ошибка при получении истекающих подписок: %s", e)
             raise
 
     async def get_expired_subscriptions(self) -> List[Dict[str, Any]]:
@@ -1282,7 +1285,7 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истекших подписок: {e}")
+            logger.error("Ошибка при получении истекших подписок: %s", e)
             raise
 
     async def get_subscriptions_for_renewal(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
@@ -1296,8 +1299,6 @@ class DatabaseService:
             Список словарей с данными подписок
         """
         try:
-            from datetime import timedelta
-
             current_date = datetime.utcnow()
             threshold_date = current_date + timedelta(days=days_threshold)
 
@@ -1312,7 +1313,7 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении подписок для продления: {e}")
+            logger.error("Ошибка при получении подписок для продления: %s", e)
             raise
 
     async def get_user_subscriptions_history(
@@ -1341,5 +1342,5 @@ class DatabaseService:
 
             return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Ошибка при получении истории подписок пользователя {user_id}: {e}")
+            logger.error("Ошибка при получении истории подписок пользователя %s: %s", user_id, e)
             raise

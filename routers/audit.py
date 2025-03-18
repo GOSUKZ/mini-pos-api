@@ -1,9 +1,15 @@
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+"""
+This module contains the router for the audit log.
+"""
+
 import logging
-from utils.dependencies import get_db_service, has_role
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
 from core.database import DatabaseService
 from core.models import User
+from utils.dependencies import get_db_service, has_role
 
 logger = logging.getLogger("audit_router")
 
@@ -31,7 +37,7 @@ async def get_audit_logs(
     Получение записей из лога аудита с фильтрацией.
     Требуются права администратора.
     """
-    logger.info(f"Запрос журнала аудита пользователем {current_user.username}")
+    logger.info("Запрос журнала аудита пользователем %s", current_user.username)
 
     try:
         logs = await db_service.get_audit_logs(
@@ -55,7 +61,7 @@ async def get_audit_logs(
 
         return logs
     except Exception as e:
-        logger.error(f"Ошибка при получении записей аудита: {str(e)}")
+        logger.error("Ошибка при получении записей аудита: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )

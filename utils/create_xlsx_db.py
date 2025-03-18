@@ -8,7 +8,6 @@ Example:
 """
 
 import asyncio
-import os
 
 import asyncpg
 import pandas as pd

@@ -1,7 +1,22 @@
+"""
+This module provides a router for handling authentication-related endpoints.
+
+The endpoints are:
+- `/auth/register`: Registers a new user.
+- `/auth/login`: Logs in an existing user.
+- `/auth/logout`: Logs out the current user.
+- `/auth/token`: Generates a new token for the current user.
+- `/auth/refresh`: Refreshes the token for the current user.
+- `/auth/google`: Logs in with Google.
+
+The module uses the `get_auth_service` dependency to create an instance of the
+`AuthService` class, which provides the actual authentication logic.
+"""
+
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
 
 from config import get_settings
@@ -27,7 +42,7 @@ async def register_user(
     """
     Регистрация нового пользователя.
     """
-    logger.info(f"Регистрация нового пользователя: {user_data.username}")
+    logger.info("Регистрация нового пользователя: %s", user_data.username)
 
     try:
         user = await auth_service.register_user(
@@ -39,10 +54,10 @@ async def register_user(
 
         return {"message": "User registered successfully", "username": user.get("username")}
     except ValueError as e:
-        logger.warning(f"Ошибка при регистрации пользователя: {str(e)}")
+        logger.warning("Ошибка при регистрации пользователя: %s", str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при регистрации пользователя: {str(e)}")
+        logger.error("Ошибка при регистрации пользователя: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -82,7 +97,7 @@ async def login_for_access_token(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка при аутентификации пользователя: {str(e)}")
+        logger.error("Ошибка при аутентификации пользователя: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )

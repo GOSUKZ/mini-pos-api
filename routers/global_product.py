@@ -88,7 +88,7 @@ async def read_products(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при получении списка товаров: {str(e)}")
+        logger.error("Ошибка при получении списка товаров: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -104,7 +104,7 @@ async def create_product(
     Создание нового товара.
     Требуются права администратора или менеджера.
     """
-    logger.info(f"Создание товара пользователем {current_user.username}")
+    logger.info("Creating product by user %s", current_user.username)
 
     try:
         created_product = await product_service.create_product(
@@ -115,7 +115,7 @@ async def create_product(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при создании товара: {str(e)}")
+        logger.error("Ошибка при создании товара: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -130,7 +130,7 @@ async def read_product(
     """
     Получение товара по ID.
     """
-    logger.info(f"Получение товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
         product = await product_service.get_product(
@@ -142,7 +142,7 @@ async def read_product(
 
         return product
     except Exception as e:
-        logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при получении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -159,7 +159,7 @@ async def update_product(
     Обновление товара по ID.
     Требуются права администратора или менеджера.
     """
-    logger.info(f"Обновление товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
         updated_product = await product_service.update_product(
@@ -175,7 +175,7 @@ async def update_product(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
@@ -191,7 +191,7 @@ async def delete_product(
     Удаление товара по ID.
     Требуются права администратора.
     """
-    logger.info(f"Удаление товара с ID {product_id} пользователем {current_user.username}")
+    logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
         result = await product_service.delete_product(
@@ -203,7 +203,7 @@ async def delete_product(
 
         return None
     except Exception as e:
-        logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
+        logger.error("Ошибка при удалении товара с ID %s: %s", product_id, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )

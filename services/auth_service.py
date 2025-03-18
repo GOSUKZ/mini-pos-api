@@ -1,3 +1,9 @@
+"""
+Module for authentication service.
+
+This module provides a service for authentication operations.
+"""
+
 import logging
 import os
 from datetime import datetime, timedelta
@@ -105,7 +111,7 @@ class AuthService:
 
             return user
         except Exception as e:
-            logger.error(f"Ошибка при аутентификации пользователя {username}: {str(e)}")
+            logger.error("Ошибка при аутентификации пользователя %s: %s", username, str(e))
             raise
 
     def create_access_token(
@@ -134,7 +140,7 @@ class AuthService:
             encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
             return encoded_jwt
         except Exception as e:
-            logger.error(f"Ошибка при создании токена: {str(e)}")
+            logger.error("Ошибка при создании токена: %s", str(e))
             raise
 
     def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
@@ -157,7 +163,7 @@ class AuthService:
             logger.warning("Недействительный токен")
             return None
         except Exception as e:
-            logger.error(f"Ошибка при декодировании токена: {str(e)}")
+            logger.error("Ошибка при декодировании токена: %s", str(e))
             return None
 
     async def get_current_user(self, token: str) -> Optional[Dict[str, Any]]:
@@ -184,7 +190,7 @@ class AuthService:
             user = await self.db_service.get_user_by_username(username)
             return user
         except Exception as e:
-            logger.error(f"Ошибка при получении пользователя по токену: {str(e)}")
+            logger.error("Ошибка при получении пользователя по токену: %s", str(e))
             return None
 
     def check_permissions(self, user: Dict[str, Any], required_roles: List[str]) -> bool:
@@ -262,7 +268,7 @@ class AuthService:
 
             return user
         except Exception as e:
-            logger.error(f"Ошибка при регистрации пользователя {username}: {str(e)}")
+            logger.error("Ошибка при регистрации пользователя %s: %s", username, str(e))
             raise
 
     async def get_google_auth_url(self) -> str:

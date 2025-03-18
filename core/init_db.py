@@ -1,9 +1,20 @@
+"""
+This module is responsible for initializing the database.
+
+It sets up the necessary tables and configurations required for
+the application to function properly. It ensures that the database
+is ready for use by creating the required tables if they do not
+already exist.
+"""
+
 import logging
 from datetime import datetime
 
 import asyncpg
 
 from config import get_settings
+from core.database import DatabaseService
+from services.auth_service import AuthService
 
 # Инициализируем настройки
 settings = get_settings()
@@ -223,8 +234,6 @@ async def create_database():
     # Проверяем наличие администратора в системе
     admin_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE roles LIKE '%admin%'")
     if admin_count == 0:
-        from core.database import DatabaseService
-        from services.auth_service import AuthService
 
         db_service = DatabaseService(conn)
         auth_service = AuthService(db_service)

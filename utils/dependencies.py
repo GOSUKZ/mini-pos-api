@@ -1,3 +1,12 @@
+"""
+Utilities for FastAPI dependencies.
+
+This module provides functions and classes for working with FastAPI dependencies
+in a more convenient way. It includes functions for creating dependencies with
+authentication and authorization, as well as classes for creating custom
+dependencies.
+"""
+
 import logging
 from typing import Awaitable, Callable, List
 
@@ -7,6 +16,7 @@ from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from config import get_settings
 from core.database import DatabaseService
 from core.models import User
+from main import app
 from services.auth_service import AuthService
 from services.payment_service import PaymentService
 from services.product_service import ProductService
@@ -26,8 +36,8 @@ def get_db():
     Получает соединение с базой данных из состояния приложения.
     Используется как зависимость.
     """
-    from main import app
 
+    # pylint: disable=no-member
     return app.db_pool
 
 
@@ -77,7 +87,7 @@ async def get_current_user(
     user = await auth_service.get_current_user(token)
 
     if not user:
-        logger.warning(f"Недействительные учетные данные: {token[:10]}...")
+        logger.warning("Недействительные учетные данные: %s...", token[:10])
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
@@ -96,7 +106,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         HTTPException: Если пользователь неактивен
     """
     if not current_user.is_active:
-        logger.warning(f"Попытка доступа неактивного пользователя: {current_user.username}")
+        logger.warning("Попытка доступа неактивного пользователя: %s", current_user.username)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     return current_user
@@ -122,7 +132,9 @@ def has_role(required_roles: List[str]) -> Callable[[User], Awaitable[User]]:
                 return current_user
 
         logger.warning(
-            f"Отказ в доступе пользователю {current_user.username}. Требуемые роли: {required_roles}"
+            "Отказ в доступе пользователю %s. Требуемые роли: %s",
+            current_user.username,
+            ", ".join(required_roles),
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 

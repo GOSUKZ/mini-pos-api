@@ -1,3 +1,12 @@
+"""
+This module initializes and configures the FastAPI application.
+
+It sets up middleware, exception handlers, and routes for handling
+various API endpoints and services. The application serves as the
+entry point for the backend server, managing requests and responses
+using FastAPI's asynchronous capabilities.
+"""
+
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -82,19 +91,34 @@ async def custom_middleware(request: Request, call_next):
 
 # Обработчик ошибок валидации
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(exc: RequestValidationError):
+    """
+    Handles validation errors for incoming requests.
+
+    This function is triggered when a request fails validation.
+    It extracts error details and returns a structured JSON response.
+
+    Args:
+        exc (RequestValidationError): The exception containing validation errors.
+
+    Returns:
+        JSONResponse: A response with status 422 and error details.
+    """
     error_details = []
+
+    # Extract details from each validation error
     for error in exc.errors():
         error_details.append(
             {
-                "loc": error.get("loc", []),
-                "msg": error.get("msg", ""),
-                "type": error.get("type", ""),
+                "loc": error.get("loc", []),  # Location of the error
+                "msg": error.get("msg", ""),  # Error message
+                "type": error.get("type", ""),  # Type of error
             }
         )
 
-    logger.warning(f"Ошибка валидации: {error_details}")
+    logger.warning("Ошибка валидации: %s", error_details)  # Log the validation errors
 
+    # Return a JSON response with error details
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": error_details}
     )
@@ -129,9 +153,14 @@ app.include_router(payment_router)
 app.include_router(metrics.router)
 
 
-# Корневой эндпоинт
 @app.get("/", tags=["root"])
 async def root():
+    """
+    Root endpoint of the Products API.
+
+    Returns:
+        A dictionary containing a welcome message, API version, and documentation URLs.
+    """
     return {
         "message": "Welcome to the Products API",
         "version": settings.APP_VERSION,

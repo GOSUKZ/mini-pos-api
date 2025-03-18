@@ -1,3 +1,10 @@
+"""
+Module for product service.
+
+This module contains the ProductService class, which provides a service layer
+for working with products. It implements business logic and validation.
+"""
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -51,7 +58,7 @@ class ProductService:
 
             return product
         except Exception as e:
-            logger.error(f"Ошибка при получении товара по штрих-коду {barcode}: {str(e)}")
+            logger.error("Ошибка при получении товара по штрих-коду %s: %s", barcode, e)
             raise
 
     async def get_products(
@@ -120,7 +127,7 @@ class ProductService:
             return response
 
         except Exception as e:
-            logger.error(f"Ошибка при получении списка товаров: {str(e)}")
+            logger.error("Ошибка при получении списка товаров: %s", str(e))
             raise
 
     async def get_product(
@@ -290,7 +297,7 @@ class ProductService:
 
             return result
         except Exception as e:
-            logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
+            logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
             raise
 
     async def get_local_products(
