@@ -1,5 +1,6 @@
-from typing import Dict, List, Optional, Any
 import logging
+from typing import Any, Dict, Optional
+
 from core.database import DatabaseService
 
 logger = logging.getLogger("product_service")
@@ -20,7 +21,9 @@ class ProductService:
         """
         self.db_service = db_service
 
-    async def get_product_by_barcode(self, barcode: str, current_user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def get_product_by_barcode(
+        self, barcode: str, current_user: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Получение товара по штрих-коду.
 
@@ -120,7 +123,9 @@ class ProductService:
             logger.error(f"Ошибка при получении списка товаров: {str(e)}")
             raise
 
-    async def get_product(self, product_id: int, current_user: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+    async def get_product(
+        self, product_id: int, current_user: Dict[str, Any] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Получает товар по ID.
         Добавляет запись в лог аудита.
@@ -149,7 +154,9 @@ class ProductService:
             logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
             raise
 
-    async def create_product(self, product_data: Dict[str, Any], current_user: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def create_product(
+        self, product_data: Dict[str, Any], current_user: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """
         Создает новый товар с проверкой бизнес-правил.
         Добавляет запись в лог аудита.
@@ -163,9 +170,13 @@ class ProductService:
         """
         try:
             # Проверяем уникальность SKU
-            existing_product = await self.db_service.get_product_by_sku(product_data.get("sku_code", ""))
+            existing_product = await self.db_service.get_product_by_sku(
+                product_data.get("sku_code", "")
+            )
             if existing_product:
-                raise ValueError(f"Product with SKU code '{product_data.get('sku_code')}' already exists")
+                raise ValueError(
+                    f"Product with SKU code '{product_data.get('sku_code')}' already exists"
+                )
 
             # Проверяем бизнес-правила
             self._validate_product_data(product_data)
@@ -210,10 +221,15 @@ class ProductService:
                 return None
 
             # Проверяем уникальность SKU, если он изменяется
-            if "sku_code" in product_data and product_data["sku_code"] != existing_product["sku_code"]:
+            if (
+                "sku_code" in product_data
+                and product_data["sku_code"] != existing_product["sku_code"]
+            ):
                 sku_product = await self.db_service.get_product_by_sku(product_data["sku_code"])
                 if sku_product and sku_product["id"] != product_id:
-                    raise ValueError(f"Product with SKU code '{product_data['sku_code']}' already exists")
+                    raise ValueError(
+                        f"Product with SKU code '{product_data['sku_code']}' already exists"
+                    )
 
             # Объединяем существующие и новые данные для валидации
             merged_data = {**existing_product, **product_data}
@@ -275,6 +291,190 @@ class ProductService:
             return result
         except Exception as e:
             logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
+            raise
+
+    async def get_local_products(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        department: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Получает список локальных продуктов пользователя с фильтрацией и сортировкой.
+
+        Args:
+            user_id: ID пользователя
+            skip: Количество записей для пропуска (пагинация)
+            limit: Количество записей для получения
+            search: Поисковый запрос
+            sort_by: Поле сортировки
+            sort_order: Порядок сортировки (asc/desc)
+
+        Returns:
+            Словарь с метаинформацией и списком локальных продуктов
+        """
+        try:
+            total_count = await self.db_service.get_local_products_count(
+                user_id=user_id,
+                search=search,
+                department=department,
+                min_price=min_price,
+                max_price=max_price,
+            )
+
+            products = await self.db_service.get_local_products(
+                user_id=user_id,
+                skip=skip,
+                limit=limit,
+                search=search,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                department=department,
+                min_price=min_price,
+                max_price=max_price,
+            )
+
+            current_page = (skip // limit) + 1 if limit > 0 else 1
+            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+            is_last = current_page >= total_pages
+
+            response = {
+                "total_count": total_count,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "skip": skip,
+                "is_last": is_last,
+                "content": products,
+            }
+
+            return response
+
+        except Exception as e:
+            logger.error("Ошибка при получении локальных продуктов: %s", str(e))
+            raise
+
+    async def get_local_product(self, product_id: int, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Получает локальный продукт по ID.
+
+        Args:
+            product_id: ID локального продукта
+            user_id: ID пользователя
+
+        Returns:
+            Словарь с данными продукта или None, если продукт не найден
+        """
+        try:
+            product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            return product
+        except Exception as e:
+            logger.error(f"Ошибка при получении локального продукта {product_id}: {str(e)}")
+            raise
+
+    async def create_local_product(
+        self, product_data: Dict[str, Any], user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Создает новый локальный продукт.
+
+        Args:
+            product_data: Данные нового продукта
+            user_id: ID пользователя
+
+        Returns:
+            Словарь с данными созданного продукта
+        """
+        try:
+            # Проверка уникальности SKU среди локальных продуктов пользователя
+            existing_product = await self.db_service.get_local_product_by_sku(
+                user_id, product_data.get("sku_code", "")
+            )
+            if existing_product:
+                raise ValueError(
+                    f"Local product with SKU '{product_data.get('sku_code')}' already exists"
+                )
+
+            # Проверка бизнес-логики
+            self._validate_product_data(product_data)
+
+            product = await self.db_service.create_local_product(product_data, user_id)
+
+            return product
+        except Exception as e:
+            logger.error(f"Ошибка при создании локального продукта: {str(e)}")
+            raise
+
+    async def update_local_product(
+        self, product_id: int, product_data: Dict[str, Any], user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Обновляет локальный продукт.
+
+        Args:
+            product_id: ID локального продукта
+            product_data: Данные для обновления
+            user_id: ID пользователя
+
+        Returns:
+            Обновленные данные продукта или None, если продукт не найден
+        """
+        try:
+            existing_product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            if not existing_product:
+                return None
+
+            # Проверка уникальности SKU, если он изменяется
+            if (
+                "sku_code" in product_data
+                and product_data["sku_code"] != existing_product["sku_code"]
+            ):
+                sku_product = await self.db_service.get_local_product_by_sku(
+                    user_id, product_data["sku_code"]
+                )
+                if sku_product and sku_product["id"] != product_id:
+                    raise ValueError(
+                        f"Local product with SKU '{product_data['sku_code']}' already exists"
+                    )
+
+            merged_data = {**existing_product, **product_data}
+            self._validate_product_data(merged_data)
+
+            updated_product = await self.db_service.update_local_product(
+                product_id, product_data, user_id
+            )
+
+            return updated_product
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении локального продукта {product_id}: {str(e)}")
+            raise
+
+    async def delete_local_product(self, product_id: int, user_id: str) -> bool:
+        """
+        Удаляет локальный продукт.
+
+        Args:
+            product_id: ID локального продукта
+            user_id: ID пользователя
+
+        Returns:
+            True, если продукт удален, иначе False
+        """
+        try:
+            product = await self.db_service.get_local_product_by_id(product_id, user_id)
+            if not product:
+                return False
+
+            result = await self.db_service.delete_local_product(product_id, user_id)
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при удалении локального продукта {product_id}: {str(e)}")
             raise
 
     def _validate_product_data(self, product_data: Dict[str, Any]) -> None:

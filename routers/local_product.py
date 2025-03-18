@@ -1,9 +1,17 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 import logging
-from utils.dependencies import get_product_service, get_current_active_user, has_role, can_read_products
-from services.product_service import ProductService
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+
+from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User
+from services.product_service import ProductService
+from utils.dependencies import (
+    can_read_products,
+    get_current_active_user,
+    get_product_service,
+    has_role,
+)
 
 logger = logging.getLogger("local_product_router")
 
@@ -15,7 +23,7 @@ router = APIRouter(
 )
 
 
-@router.get("/", response_model=List[Product])
+@router.get("/", response_model=ProductResponseDTO)
 async def read_products(
     skip: int = 0,
     limit: int = 100,
@@ -31,10 +39,13 @@ async def read_products(
     """
     Получение списка товаров с фильтрацией и сортировкой.
     """
-    logger.info(f"Получение списка товаров пользователем {current_user.username}")
+    logger.info(
+        "Получение списка товаров пользователем %s, %s", current_user.username, current_user.id
+    )
 
     try:
-        products = await product_service.get_products(
+        products = await product_service.get_local_products(
+            user_id=current_user.id,
             skip=skip,
             limit=limit,
             search=search,
@@ -43,15 +54,16 @@ async def read_products(
             department=department,
             min_price=min_price,
             max_price=max_price,
-            current_user=current_user.model_dump(),
         )
 
         return products
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Ошибка при получении списка товаров: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        logger.error("Ошибка при получении списка товаров: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )
 
 
 @router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED)
@@ -76,7 +88,9 @@ async def create_product(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Ошибка при создании товара: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )
 
 
 @router.get("/{product_id}", response_model=Product)
@@ -91,7 +105,9 @@ async def read_product(
     logger.info(f"Получение товара с ID {product_id} пользователем {current_user.username}")
 
     try:
-        product = await product_service.get_product(product_id=product_id, current_user=current_user.model_dump())
+        product = await product_service.get_product(
+            product_id=product_id, current_user=current_user.model_dump()
+        )
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -99,7 +115,9 @@ async def read_product(
         return product
     except Exception as e:
         logger.error(f"Ошибка при получении товара с ID {product_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )
 
 
 @router.put("/{product_id}", response_model=Product)
@@ -130,7 +148,9 @@ async def update_product(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Ошибка при обновлении товара с ID {product_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -146,7 +166,9 @@ async def delete_product(
     logger.info(f"Удаление товара с ID {product_id} пользователем {current_user.username}")
 
     try:
-        result = await product_service.delete_product(product_id=product_id, current_user=current_user.model_dump())
+        result = await product_service.delete_product(
+            product_id=product_id, current_user=current_user.model_dump()
+        )
 
         if not result:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -154,4 +176,6 @@ async def delete_product(
         return None
     except Exception as e:
         logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )

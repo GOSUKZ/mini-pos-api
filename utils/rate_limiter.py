@@ -1,6 +1,8 @@
-from collections import defaultdict
 import time
+from collections import defaultdict
+
 from fastapi import HTTPException, status
+
 
 class RateLimiter:
     """
@@ -32,14 +34,19 @@ class RateLimiter:
 
         # Удаляем устаревшие записи запросов
         self.request_counts[user_identifier] = [
-            timestamp for timestamp in self.request_counts[user_identifier]
+            timestamp
+            for timestamp in self.request_counts[user_identifier]
             if current_time - timestamp < self.time_window
         ]
 
         # Проверяем количество запросов в текущем окне
         if len(self.request_counts[user_identifier]) >= self.max_requests:
             # Вычисляем время до сброса лимита
-            oldest_request = min(self.request_counts[user_identifier]) if self.request_counts[user_identifier] else current_time
+            oldest_request = (
+                min(self.request_counts[user_identifier])
+                if self.request_counts[user_identifier]
+                else current_time
+            )
             reset_time = oldest_request + self.time_window - current_time
 
             headers = {
@@ -51,7 +58,7 @@ class RateLimiter:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded. Try again in {int(reset_time)} seconds.",
-                headers=headers
+                headers=headers,
             )
 
         # Записываем текущий запрос
@@ -60,6 +67,8 @@ class RateLimiter:
         # Возвращаем информацию о лимитах для заголовков
         return {
             "X-RateLimit-Limit": str(self.max_requests),
-            "X-RateLimit-Remaining": str(self.max_requests - len(self.request_counts[user_identifier])),
+            "X-RateLimit-Remaining": str(
+                self.max_requests - len(self.request_counts[user_identifier])
+            ),
             "X-RateLimit-Reset": str(int(self.time_window)),
         }

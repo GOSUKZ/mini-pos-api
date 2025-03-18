@@ -1,7 +1,8 @@
-import pandas as pd
-import aiosqlite
-import os
 import asyncio
+import os
+
+import aiosqlite
+import pandas as pd
 
 
 async def create_database(db_name):
@@ -9,7 +10,8 @@ async def create_database(db_name):
     conn = await aiosqlite.connect(db_name)
 
     # Создаем таблицу товаров
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sku_code TEXT UNIQUE,
@@ -24,7 +26,8 @@ async def create_database(db_name):
         cost_price REAL,
         price REAL
     )
-    ''')
+    """
+    )
 
     await conn.commit()
     return conn
@@ -59,8 +62,15 @@ async def parse_excel_to_sqlite(excel_file, db_name):
 
             # Проверка наличия всех необходимых колонок
             required_columns = [
-                'Код SKU', 'Штрих Код', 'Единица измерения', 'Наименование SKU',
-                'Статус 1С', 'Отдел', 'Группа', 'Подгруппа', 'Поставщик'
+                "Код SKU",
+                "Штрих Код",
+                "Единица измерения",
+                "Наименование SKU",
+                "Статус 1С",
+                "Отдел",
+                "Группа",
+                "Подгруппа",
+                "Поставщик",
             ]
 
             # Проверяем наличие всех колонок
@@ -71,14 +81,15 @@ async def parse_excel_to_sqlite(excel_file, db_name):
                 continue
 
             # Пропускаем строки с пустыми значениями SKU
-            df = df.dropna(subset=['Код SKU'])
+            df = df.dropna(subset=["Код SKU"])
 
             # Добавляем записи в базу данных
             for _, row in df.iterrows():
                 try:
                     # Проверяем, существует ли уже этот товар в базе
-                    async with conn.execute("SELECT sku_code FROM products WHERE sku_code = ?",
-                                            (row['Код SKU'],)) as cursor:
+                    async with conn.execute(
+                        "SELECT sku_code FROM products WHERE sku_code = ?", (row["Код SKU"],)
+                    ) as cursor:
                         result = await cursor.fetchone()
 
                     if result:
@@ -87,25 +98,28 @@ async def parse_excel_to_sqlite(excel_file, db_name):
                         continue
 
                     # Добавляем новый товар
-                    await conn.execute('''
+                    await conn.execute(
+                        """
                     INSERT INTO products (
                         sku_code, barcode, unit, sku_name, status_1c, 
                         department, group_name, subgroup, supplier,
                         cost_price, price
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        row['Код SKU'],
-                        row['Штрих Код'],
-                        row['Единица измерения'],
-                        row['Наименование SKU'],
-                        row['Статус 1С'],
-                        row['Отдел'],
-                        row['Группа'],
-                        row['Подгруппа'],
-                        row['Поставщик'],
-                        0,  # Пустое значение для себестоимости
-                        0  # Пустое значение для цены
-                    ))
+                    """,
+                        (
+                            row["Код SKU"],
+                            row["Штрих Код"],
+                            row["Единица измерения"],
+                            row["Наименование SKU"],
+                            row["Статус 1С"],
+                            row["Отдел"],
+                            row["Группа"],
+                            row["Подгруппа"],
+                            row["Поставщик"],
+                            0,  # Пустое значение для себестоимости
+                            0,  # Пустое значение для цены
+                        ),
+                    )
                     added_records += 1
 
                 except aiosqlite.IntegrityError:
@@ -144,7 +158,10 @@ async def main():
         return
 
     # Имя базы данных SQLite (можно изменить)
-    db_name = input("Введите имя файла базы данных SQLite (по умолчанию 'products.db'): ") or "products.db"
+    db_name = (
+        input("Введите имя файла базы данных SQLite (по умолчанию 'products.db'): ")
+        or "products.db"
+    )
 
     # Запускаем парсинг
     await parse_excel_to_sqlite(excel_file, db_name)

@@ -1,16 +1,22 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, MagicMock
-import json
-from datetime import timedelta
+
+from core.database import DatabaseService
+from core.models import User
 
 # Импортируем основное приложение
 from main import app
 from services.auth_service import AuthService
-from core.database import DatabaseService
 from services.product_service import ProductService
-from utils.dependencies import get_auth_service, get_db_service, get_product_service, has_role, get_current_active_user
-from core.models import User, Product, ProductCreate, ProductUpdate, UserUpdate
+from utils.dependencies import (
+    get_auth_service,
+    get_current_active_user,
+    get_db_service,
+    get_product_service,
+    has_role,
+)
 
 
 # Моки сервисов
@@ -34,26 +40,50 @@ def mock_product_service():
 
 @pytest.fixture
 def mock_current_user():
-    return User(id=1, username="testuser", email="test@example.com", roles=["user"], hashed_password="password",
-                is_active=True)
+    return User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        roles=["user"],
+        hashed_password="password",
+        is_active=True,
+    )
 
 
 @pytest.fixture
 def mock_admin_user():
-    return User(id=2, username="adminuser", email="admin@example.com", roles=["admin"], hashed_password="password",
-                is_active=True)
+    return User(
+        id=2,
+        username="adminuser",
+        email="admin@example.com",
+        roles=["admin"],
+        hashed_password="password",
+        is_active=True,
+    )
 
 
 @pytest.fixture
 def mock_manager_user():
-    return User(id=3, username="manageruser", email="manager@example.com", roles=["manager"],
-                hashed_password="password", is_active=True)
+    return User(
+        id=3,
+        username="manageruser",
+        email="manager@example.com",
+        roles=["manager"],
+        hashed_password="password",
+        is_active=True,
+    )
 
 
 # Настройка тестового клиента с переопределением зависимостей
 @pytest.fixture
-def test_client(mock_auth_service, mock_db_service, mock_product_service, mock_current_user, mock_admin_user,
-                mock_manager_user):
+def test_client(
+    mock_auth_service,
+    mock_db_service,
+    mock_product_service,
+    mock_current_user,
+    mock_admin_user,
+    mock_manager_user,
+):
     def get_mock_auth_service():
         return mock_auth_service
 
@@ -91,15 +121,17 @@ def test_client(mock_auth_service, mock_db_service, mock_product_service, mock_c
         return inner_has_role
 
     # Переопределяем зависимости
-    app.dependency_overrides.update({
-        get_auth_service: get_mock_auth_service,
-        get_db_service: get_mock_db_service,
-        get_product_service: get_mock_product_service,
-        get_current_active_user: mock_get_current_active_user,
-        has_role(["admin"]): mock_has_admin_role(),
-        has_role(["manager"]): mock_has_manager_role(),
-        has_role(["admin", "manager"]): mock_has_admin_or_manager_role(),
-    })
+    app.dependency_overrides.update(
+        {
+            get_auth_service: get_mock_auth_service,
+            get_db_service: get_mock_db_service,
+            get_product_service: get_mock_product_service,
+            get_current_active_user: mock_get_current_active_user,
+            has_role(["admin"]): mock_has_admin_role(),
+            has_role(["manager"]): mock_has_manager_role(),
+            has_role(["admin", "manager"]): mock_has_admin_or_manager_role(),
+        }
+    )
 
     # Создаем тестовый клиент
     client = TestClient(app)
@@ -119,7 +151,9 @@ def test_get_audit_logs_success(test_client, mock_db_service, mock_admin_user):
     # Тестовый запрос с токеном админа (мокаем current_user через фикстуру)
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.get("/audit/logs")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_admin_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 200
@@ -132,7 +166,9 @@ def test_get_audit_logs_forbidden(test_client, mock_db_service, mock_current_use
     # Тестовый запрос без прав админа (обычный user)
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
     response = test_client.get("/audit/logs")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_admin_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 403
@@ -148,7 +184,9 @@ def test_get_audit_logs_server_error(test_client, mock_db_service, mock_admin_us
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.get("/audit/logs")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_admin_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 500
@@ -170,7 +208,7 @@ product_mock_data = {
     "group_name": "group",
     "supplier": "supplier",
     "cost_price": 10.0,
-    "price": 20.0
+    "price": 20.0,
 }
 
 
@@ -216,16 +254,15 @@ def test_create_product_success(test_client, mock_product_service, mock_manager_
         "supplier": "supplier",
         "cost_price": 10.0,
         "price": 20.0,
-        "description": "Test description"
+        "description": "Test description",
     }
 
     # Тестовый запрос с токеном менеджера
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.post(
-        "/products/",
-        json=product_request
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.post("/products/", json=product_request)
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 201
@@ -238,9 +275,16 @@ def test_create_product_forbidden(test_client, mock_product_service, mock_curren
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
     response = test_client.post(
         "/products/",
-        json={"name": "New Product", "description": "Test description", "price": 10.0, "department": "Test"}
+        json={
+            "name": "New Product",
+            "description": "Test description",
+            "price": 10.0,
+            "department": "Test",
+        },
     )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_manager_user
+    )  # restore default for other tests
 
     # Проверки - исправлено сообщение об ошибке
     assert response.status_code == 403
@@ -253,10 +297,11 @@ def test_create_product_validation_error(test_client, mock_manager_user):
     # Тестовый запрос с неверными данными (отсутствуют обязательные поля)
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
     response = test_client.post(
-        "/products/",
-        json={"name": "Invalid Product"}  # Missing other required fields
+        "/products/", json={"name": "Invalid Product"}  # Missing other required fields
     )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 422  # Ошибка валидации
@@ -277,16 +322,15 @@ def test_create_product_server_error(test_client, mock_product_service, mock_man
         "supplier": "supplier",
         "cost_price": 10.0,
         "price": 20.0,
-        "description": "Product that should trigger error"
+        "description": "Product that should trigger error",
     }
 
     # Тестовый запрос с токеном менеджера
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.post(
-        "/products/",
-        json=product_request
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.post("/products/", json=product_request)
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 500
@@ -342,11 +386,10 @@ def test_update_product_success(test_client, mock_product_service, mock_manager_
 
     # Тестовый запрос с токеном менеджера
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.put(
-        "/products/1",
-        json={"name": "Updated Product"}
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.put("/products/1", json={"name": "Updated Product"})
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 200
@@ -357,11 +400,10 @@ def test_update_product_success(test_client, mock_product_service, mock_manager_
 def test_update_product_forbidden(test_client, mock_product_service, mock_current_user):
     # Тестовый запрос без прав менеджера/админа (обычный user)
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
-    response = test_client.put(
-        "/products/1",
-        json={"name": "Updated Product"}
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user  # restore default for other tests
+    response = test_client.put("/products/1", json={"name": "Updated Product"})
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_manager_user
+    )  # restore default for other tests
 
     # Проверки - исправлено сообщение об ошибке
     assert response.status_code == 403
@@ -375,11 +417,10 @@ def test_update_product_not_found(test_client, mock_product_service, mock_manage
 
     # Тестовый запрос с токеном менеджера
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.put(
-        "/products/1",
-        json={"name": "Updated Product"}
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.put("/products/1", json={"name": "Updated Product"})
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки - исправлено на 500, так как текущее поведение API возвращает 500 при отсутствии продукта
     assert response.status_code == 500
@@ -389,11 +430,10 @@ def test_update_product_not_found(test_client, mock_product_service, mock_manage
 def test_update_product_validation_error(test_client, mock_manager_user):
     # Тестовый запрос с неверными данными (например, price negative)
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.put(
-        "/products/1",
-        json={"price": -1}
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.put("/products/1", json={"price": -1})
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 422  # Ошибка валидации
@@ -405,11 +445,10 @@ def test_update_product_server_error(test_client, mock_product_service, mock_man
 
     # Тестовый запрос с токеном менеджера
     app.dependency_overrides[get_current_active_user] = lambda: mock_manager_user
-    response = test_client.put(
-        "/products/1",
-        json={"name": "Updated Product"}
-    )
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    response = test_client.put("/products/1", json={"name": "Updated Product"})
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 500
@@ -424,7 +463,9 @@ def test_delete_product_success(test_client, mock_product_service, mock_admin_us
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.delete("/products/1")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 204
@@ -435,7 +476,9 @@ def test_delete_product_forbidden(test_client, mock_product_service, mock_curren
     # Тестовый запрос без прав админа (обычный user)
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
     response = test_client.delete("/products/1")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_admin_user
+    )  # restore default for other tests
 
     # Проверки - исправлено сообщение об ошибке
     assert response.status_code == 403
@@ -450,7 +493,9 @@ def test_delete_product_not_found(test_client, mock_product_service, mock_admin_
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.delete("/products/1")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки - исправлено на 500, так как текущее поведение API возвращает 500 при отсутствии продукта
     assert response.status_code == 500
@@ -464,7 +509,9 @@ def test_delete_product_server_error(test_client, mock_product_service, mock_adm
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.delete("/products/1")
-    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default for other tests
+    app.dependency_overrides[get_current_active_user] = (
+        lambda: mock_current_user
+    )  # restore default for other tests
 
     # Проверки
     assert response.status_code == 500
@@ -491,10 +538,7 @@ def test_read_users_me_unauthorized(test_client):
     from fastapi import HTTPException, status
 
     def mock_unauthorized_user():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     # Тестовый запрос без токена
     app.dependency_overrides[get_current_active_user] = mock_unauthorized_user
@@ -506,16 +550,21 @@ def test_read_users_me_unauthorized(test_client):
     assert response.json()["detail"] == "Not authenticated"
 
 
-def test_update_users_me_success(test_client, mock_db_service, mock_auth_service, mock_current_user):
+def test_update_users_me_success(
+    test_client, mock_db_service, mock_auth_service, mock_current_user
+):
     # Настраиваем мок
-    mock_db_service.update_user.return_value = {"id": 1, "username": "testuser", "email": "updated@example.com",
-                                                "roles": ["user"]}
+    mock_db_service.update_user.return_value = {
+        "id": 1,
+        "username": "testuser",
+        "email": "updated@example.com",
+        "roles": ["user"],
+    }
     mock_auth_service.get_password_hash.return_value = "hashed_password"
 
     # Тестовый запрос
     response = test_client.put(
-        "/users/me",
-        json={"email": "updated@example.com", "password": "NewPassword123!"}
+        "/users/me", json={"email": "updated@example.com", "password": "NewPassword123!"}
     )
 
     # Проверки
@@ -531,17 +580,11 @@ def test_update_users_me_unauthorized(test_client):
     from fastapi import HTTPException, status
 
     def mock_unauthorized_user():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     # Тестовый запрос без токена
     app.dependency_overrides[get_current_active_user] = mock_unauthorized_user
-    response = test_client.put(
-        "/users/me",
-        json={"email": "updated@example.com"}
-    )
+    response = test_client.put("/users/me", json={"email": "updated@example.com"})
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default
 
     # Проверки
@@ -551,25 +594,21 @@ def test_update_users_me_unauthorized(test_client):
 
 def test_update_users_me_validation_error(test_client):
     # Тестовый запрос с неверными данными
-    response = test_client.put(
-        "/users/me",
-        json={"email": "invalid-email"}  # Invalid email format
-    )
+    response = test_client.put("/users/me", json={"email": "invalid-email"})  # Invalid email format
 
     # Проверки
     assert response.status_code == 422  # Ошибка валидации
 
 
-def test_update_users_me_server_error(test_client, mock_db_service, mock_auth_service, mock_current_user):
+def test_update_users_me_server_error(
+    test_client, mock_db_service, mock_auth_service, mock_current_user
+):
     # Настраиваем мок для симуляции ошибки сервера
     mock_db_service.update_user.side_effect = Exception("Database error")
     mock_auth_service.get_password_hash.return_value = "hashed_password"
 
     # Тестовый запрос
-    response = test_client.put(
-        "/users/me",
-        json={"email": "updated@example.com"}
-    )
+    response = test_client.put("/users/me", json={"email": "updated@example.com"})
 
     # Проверки
     assert response.status_code == 500
@@ -579,19 +618,29 @@ def test_update_users_me_server_error(test_client, mock_db_service, mock_auth_se
 
 
 # Тесты для endpoint users/{username} (admin only)
-def test_update_user_admin_success(test_client, mock_db_service, mock_auth_service, mock_admin_user):
+def test_update_user_admin_success(
+    test_client, mock_db_service, mock_auth_service, mock_admin_user
+):
     # Настраиваем мок
-    mock_db_service.get_user_by_username.return_value = {"id": 4, "username": "targetuser",
-                                                         "email": "target@example.com", "roles": ["user"]}
-    mock_db_service.update_user.return_value = {"id": 4, "username": "targetuser", "email": "admin-updated@example.com",
-                                                "roles": ["admin"]}  # Admin can change roles
+    mock_db_service.get_user_by_username.return_value = {
+        "id": 4,
+        "username": "targetuser",
+        "email": "target@example.com",
+        "roles": ["user"],
+    }
+    mock_db_service.update_user.return_value = {
+        "id": 4,
+        "username": "targetuser",
+        "email": "admin-updated@example.com",
+        "roles": ["admin"],
+    }  # Admin can change roles
     mock_auth_service.get_password_hash.return_value = "hashed_password"
 
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.put(
         "/users/targetuser",
-        json={"email": "admin-updated@example.com", "roles": ["admin"], "password": "Admin123!"}
+        json={"email": "admin-updated@example.com", "roles": ["admin"], "password": "Admin123!"},
         # Используем Admin123! пароль
     )
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default
@@ -609,10 +658,7 @@ def test_update_user_admin_success(test_client, mock_db_service, mock_auth_servi
 def test_update_user_admin_forbidden(test_client, mock_db_service, mock_current_user):
     # Тестовый запрос без прав админа (обычный user)
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
-    response = test_client.put(
-        "/users/targetuser",
-        json={"email": "admin-updated@example.com"}
-    )
+    response = test_client.put("/users/targetuser", json={"email": "admin-updated@example.com"})
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user  # restore default
 
     # Проверки - исправлено сообщение об ошибке
@@ -629,8 +675,7 @@ def test_update_user_admin_not_found(test_client, mock_db_service, mock_admin_us
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.put(
-        "/users/nonexistentuser",
-        json={"email": "admin-updated@example.com"}
+        "/users/nonexistentuser", json={"email": "admin-updated@example.com"}
     )
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default
 
@@ -645,8 +690,7 @@ def test_update_user_admin_validation_error(test_client, mock_admin_user):
     # Тестовый запрос с неверными данными
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
     response = test_client.put(
-        "/users/targetuser",
-        json={"email": "invalid-email"}  # Invalid email format
+        "/users/targetuser", json={"email": "invalid-email"}  # Invalid email format
     )
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default
 
@@ -654,19 +698,22 @@ def test_update_user_admin_validation_error(test_client, mock_admin_user):
     assert response.status_code == 422  # Ошибка валидации
 
 
-def test_update_user_admin_server_error(test_client, mock_db_service, mock_auth_service, mock_admin_user):
+def test_update_user_admin_server_error(
+    test_client, mock_db_service, mock_auth_service, mock_admin_user
+):
     # Настраиваем мок для симуляции ошибки сервера
-    mock_db_service.get_user_by_username.return_value = {"id": 4, "username": "targetuser",
-                                                         "email": "target@example.com", "roles": ["user"]}
+    mock_db_service.get_user_by_username.return_value = {
+        "id": 4,
+        "username": "targetuser",
+        "email": "target@example.com",
+        "roles": ["user"],
+    }
     mock_db_service.update_user.side_effect = Exception("Database error")
     mock_auth_service.get_password_hash.return_value = "hashed_password"
 
     # Тестовый запрос с токеном админа
     app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
-    response = test_client.put(
-        "/users/targetuser",
-        json={"email": "admin-updated@example.com"}
-    )
+    response = test_client.put("/users/targetuser", json={"email": "admin-updated@example.com"})
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user  # restore default
 
     # Проверки

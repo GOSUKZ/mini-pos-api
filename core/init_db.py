@@ -1,7 +1,8 @@
 import logging
-import aiosqlite
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+
+import aiosqlite
+
 from config import get_settings
 
 # Инициализируем настройки
@@ -11,12 +12,10 @@ settings = get_settings()
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL),
     format=settings.LOG_FORMAT,
-    handlers=[
-        logging.FileHandler(settings.LOG_FILE),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.FileHandler(settings.LOG_FILE), logging.StreamHandler()],
 )
 logger = logging.getLogger("main")
+
 
 # Создаем и инициализируем базу данных
 async def create_database(db_name):
@@ -25,7 +24,8 @@ async def create_database(db_name):
     conn.row_factory = aiosqlite.Row
 
     # Создаем таблицу товаров
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sku_code TEXT UNIQUE,
@@ -40,10 +40,35 @@ async def create_database(db_name):
         cost_price REAL,
         price REAL
     )
-    ''')
+    """
+    )
+
+    await conn.execute(
+        """
+    CREATE TABLE IF NOT EXISTS local_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        sku_code TEXT,
+        barcode TEXT,
+        unit TEXT,
+        sku_name TEXT,
+        status_1c TEXT,
+        department TEXT,
+        group_name TEXT,
+        subgroup TEXT,
+        supplier TEXT,
+        cost_price REAL,
+        price REAL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    )
+    """
+    )
 
     # Создаем таблицу пользователей с дополнительными полями для OAuth
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
@@ -55,10 +80,12 @@ async def create_database(db_name):
         name TEXT,
         picture TEXT
     )
-    ''')
+    """
+    )
 
     # Создаем таблицу для OAuth аккаунтов
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS oauth_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -70,10 +97,12 @@ async def create_database(db_name):
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
         UNIQUE (provider, provider_user_id)
     )
-    ''')
+    """
+    )
 
     # Создаем таблицу для платежей
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id TEXT,
@@ -86,10 +115,12 @@ async def create_database(db_name):
         updated_at TIMESTAMP,
         details TEXT
     )
-    ''')
+    """
+    )
 
     # Создаем таблицу аудита
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         action TEXT,
@@ -99,9 +130,11 @@ async def create_database(db_name):
         timestamp TIMESTAMP,
         details TEXT
     )
-    ''')
+    """
+    )
     # Создаем таблицу для подписок
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -117,10 +150,12 @@ async def create_database(db_name):
         updated_at TIMESTAMP NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     )
-    ''')
+    """
+    )
 
     # Создаем таблицу для планов подписок
-    await conn.execute('''
+    await conn.execute(
+        """
     CREATE TABLE IF NOT EXISTS subscription_plans (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -132,7 +167,8 @@ async def create_database(db_name):
         created_at TIMESTAMP NOT NULL,
         updated_at TIMESTAMP NOT NULL
     )
-    ''')
+    """
+    )
     await conn.commit()
     # Проверяем наличие планов подписки
     async with conn.execute("SELECT COUNT(*) as count FROM subscription_plans") as cursor:
@@ -144,41 +180,75 @@ async def create_database(db_name):
             # Месячный план
             await conn.execute(
                 "INSERT INTO subscription_plans (name, plan_type, price, description, features, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                ("Basic Monthly", "monthly", 9.99, "Базовая месячная подписка", "Базовый функционал,Поддержка по email",
-                 True, now, now)
+                (
+                    "Basic Monthly",
+                    "monthly",
+                    9.99,
+                    "Базовая месячная подписка",
+                    "Базовый функционал,Поддержка по email",
+                    True,
+                    now,
+                    now,
+                ),
             )
 
             # Годовой план
             await conn.execute(
                 "INSERT INTO subscription_plans (name, plan_type, price, description, features, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                ("Basic Annual", "annual", 99.99, "Базовая годовая подписка",
-                 "Базовый функционал,Поддержка по email,Скидка 17%", True, now, now)
+                (
+                    "Basic Annual",
+                    "annual",
+                    99.99,
+                    "Базовая годовая подписка",
+                    "Базовый функционал,Поддержка по email,Скидка 17%",
+                    True,
+                    now,
+                    now,
+                ),
             )
 
             # Премиум месячный план
             await conn.execute(
                 "INSERT INTO subscription_plans (name, plan_type, price, description, features, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                ("Premium Monthly", "monthly", 19.99, "Премиум месячная подписка",
-                 "Все функции,Приоритетная поддержка,Дополнительные возможности", True, now, now)
+                (
+                    "Premium Monthly",
+                    "monthly",
+                    19.99,
+                    "Премиум месячная подписка",
+                    "Все функции,Приоритетная поддержка,Дополнительные возможности",
+                    True,
+                    now,
+                    now,
+                ),
             )
 
             # Премиум годовой план
             await conn.execute(
                 "INSERT INTO subscription_plans (name, plan_type, price, description, features, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                ("Premium Annual", "annual", 199.99, "Премиум годовая подписка",
-                 "Все функции,Приоритетная поддержка,Дополнительные возможности,Скидка 17%", True, now, now)
+                (
+                    "Premium Annual",
+                    "annual",
+                    199.99,
+                    "Премиум годовая подписка",
+                    "Все функции,Приоритетная поддержка,Дополнительные возможности,Скидка 17%",
+                    True,
+                    now,
+                    now,
+                ),
             )
 
             await conn.commit()
             logger.info("Созданы стандартные планы подписки")
 
     # Проверяем наличие администратора в системе
-    async with conn.execute("SELECT COUNT(*) as count FROM users WHERE roles LIKE '%admin%'") as cursor:
+    async with conn.execute(
+        "SELECT COUNT(*) as count FROM users WHERE roles LIKE '%admin%'"
+    ) as cursor:
         result = await cursor.fetchone()
         if result["count"] == 0:
             # Создаем админа по умолчанию, если его нет
-            from services.auth_service import AuthService
             from core.database import DatabaseService
+            from services.auth_service import AuthService
 
             db_service = DatabaseService(conn)
             auth_service = AuthService(db_service)
@@ -187,14 +257,10 @@ async def create_database(db_name):
 
             await conn.execute(
                 "INSERT INTO users (username, email, hashed_password, is_active, roles) VALUES (?, ?, ?, ?, ?)",
-                ("admin", "admin@example.com", hashed_password, True, "admin")
+                ("admin", "admin@example.com", hashed_password, True, "admin"),
             )
             await conn.commit()
 
             logger.info("Создан пользователь admin с ролью администратора")
 
     return conn
-
-
-
-

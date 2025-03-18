@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional, Any, Tuple
-import aiosqlite
 import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import aiosqlite
 
 logger = logging.getLogger("database_service")
 
@@ -69,11 +70,86 @@ class DatabaseService:
             params.append(max_price)
 
         if sort_by:
-            valid_columns = ["id", "sku_code", "sku_name", "price", "cost_price", "supplier", "department"]
+            valid_columns = [
+                "id",
+                "sku_code",
+                "sku_name",
+                "price",
+                "cost_price",
+                "supplier",
+                "department",
+            ]
             if sort_by in valid_columns:
                 query_parts.append(f"ORDER BY {sort_by} {sort_order}")
             else:
-                raise ValueError(f"Invalid sort_by parameter. Valid options: {', '.join(valid_columns)}")
+                raise ValueError(
+                    f"Invalid sort_by parameter. Valid options: {', '.join(valid_columns)}"
+                )
+        else:
+            query_parts.append("ORDER BY id ASC")
+
+        query_parts.append("LIMIT ? OFFSET ?")
+        params.extend([limit, skip])
+
+        query = " ".join(query_parts)
+
+        try:
+            async with self.db.execute(query, params) as cursor:
+                products = [dict(row) for row in await cursor.fetchall()]
+
+            return products
+        except Exception as e:
+            logger.error(f"Ошибка при получении списка товаров: {str(e)}")
+            raise
+
+    async def get_local_products(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        department: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        query_parts = ["SELECT * FROM local_products WHERE user_id = ? AND 1=1"]
+        params = [user_id]
+
+        if search:
+            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term, search_term])
+
+        if department:
+            query_parts.append("AND department = ?")
+            params.append(department)
+
+        if min_price is not None:
+            query_parts.append("AND price >= ?")
+            params.append(min_price)
+
+        if max_price is not None:
+            query_parts.append("AND price <= ?")
+            params.append(max_price)
+
+        if sort_by:
+            valid_columns = [
+                "id",
+                "sku_code",
+                "sku_name",
+                "price",
+                "cost_price",
+                "supplier",
+                "department",
+            ]
+            if sort_by in valid_columns:
+                query_parts.append(f"ORDER BY {sort_by} {sort_order}")
+            else:
+                raise ValueError(
+                    "Invalid sort_by parameter. Valid options: %s", ", ".join(valid_columns)
+                )
         else:
             query_parts.append("ORDER BY id ASC")
 
@@ -140,6 +216,56 @@ class DatabaseService:
             logger.error(f"Ошибка при получении количества товаров: {str(e)}")
             raise
 
+    async def get_local_products_count(
+        self,
+        user_id: str,
+        search: Optional[str] = None,
+        department: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+    ) -> int:
+        """
+        Получает общее количество товаров с учетом фильтрации.
+
+        Args:
+            search: Строка поиска
+            department: Фильтр по отделу
+            min_price: Минимальная цена
+            max_price: Максимальная цена
+
+        Returns:
+            Общее количество товаров
+        """
+        query_parts = ["SELECT COUNT(*) FROM local_products WHERE user_id = ? AND 1=1"]
+        params = [user_id]
+
+        if search:
+            query_parts.append("AND (sku_name LIKE ? OR sku_code LIKE ? OR barcode LIKE ?)")
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term, search_term])
+
+        if department:
+            query_parts.append("AND department = ?")
+            params.append(department)
+
+        if min_price is not None:
+            query_parts.append("AND price >= ?")
+            params.append(min_price)
+
+        if max_price is not None:
+            query_parts.append("AND price <= ?")
+            params.append(max_price)
+
+        query = " ".join(query_parts)
+
+        try:
+            async with self.db.execute(query, params) as cursor:
+                total_count = await cursor.fetchone()
+                return total_count[0] if total_count else 0
+        except Exception as e:
+            logger.error(f"Ошибка при получении количества товаров: {str(e)}")
+            raise
+
     async def get_product_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
         """
         Получение товара по штрих-коду.
@@ -151,7 +277,9 @@ class DatabaseService:
             Информация о товаре или None, если товар не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM products WHERE barcode = ?", (barcode,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM products WHERE barcode = ?", (barcode,)
+            ) as cursor:
                 result = await cursor.fetchone()
 
                 if result:
@@ -173,7 +301,9 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM products WHERE id = ?", (product_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM products WHERE id = ?", (product_id,)
+            ) as cursor:
                 product = await cursor.fetchone()
 
             return dict(product) if product else None
@@ -192,7 +322,9 @@ class DatabaseService:
             Словарь с данными товара или None, если товар не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM products WHERE sku_code = ?", (sku_code,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM products WHERE sku_code = ?", (sku_code,)
+            ) as cursor:
                 product = await cursor.fetchone()
 
             return dict(product) if product else None
@@ -226,7 +358,9 @@ class DatabaseService:
                 product_id = result["id"]
 
             # Получаем полные данные продукта
-            async with self.db.execute("SELECT * FROM products WHERE id = ?", (product_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM products WHERE id = ?", (product_id,)
+            ) as cursor:
                 product_data = await cursor.fetchone()
 
             return dict(product_data)
@@ -235,7 +369,9 @@ class DatabaseService:
             logger.error(f"Ошибка при создании товара: {str(e)}")
             raise
 
-    async def update_product(self, product_id: int, product_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_product(
+        self, product_id: int, product_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные товара.
 
@@ -267,7 +403,9 @@ class DatabaseService:
                 return None
 
             # Получаем обновленные данные
-            async with self.db.execute("SELECT * FROM products WHERE id = ?", (product_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM products WHERE id = ?", (product_id,)
+            ) as cursor:
                 updated_product = await cursor.fetchone()
 
             return dict(updated_product) if updated_product else None
@@ -296,7 +434,9 @@ class DatabaseService:
             logger.error(f"Ошибка при удалении товара с ID {product_id}: {str(e)}")
             raise
 
-    async def add_audit_log(self, action: str, entity: str, entity_id: str, user_id: str, details: str = "") -> int:
+    async def add_audit_log(
+        self, action: str, entity: str, entity_id: str, user_id: str, details: str = ""
+    ) -> int:
         """
         Добавляет запись в лог аудита.
 
@@ -316,7 +456,9 @@ class DatabaseService:
         """
 
         try:
-            await self.db.execute(query, (action, entity, entity_id, user_id, datetime.utcnow(), details))
+            await self.db.execute(
+                query, (action, entity, entity_id, user_id, datetime.utcnow(), details)
+            )
             await self.db.commit()
 
             # Получаем ID созданной записи
@@ -403,7 +545,9 @@ class DatabaseService:
             Словарь с данными пользователя или None, если пользователь не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM users WHERE username = ?", (username,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM users WHERE username = ?", (username,)
+            ) as cursor:
                 user = await cursor.fetchone()
 
             if user:
@@ -449,7 +593,9 @@ class DatabaseService:
             logger.error(f"Ошибка при создании пользователя: {str(e)}")
             raise
 
-    async def update_user(self, username: str, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_user(
+        self, username: str, user_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные пользователя.
 
@@ -520,7 +666,9 @@ class DatabaseService:
             logger.error(f"Ошибка при получении пользователя по email {email}: {str(e)}")
             raise
 
-    async def get_oauth_account(self, provider: str, provider_user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_oauth_account(
+        self, provider: str, provider_user_id: str
+    ) -> Optional[Dict[str, Any]]:
         """
         Получает OAuth аккаунт пользователя.
 
@@ -567,7 +715,9 @@ class DatabaseService:
                 account_id = result["id"]
 
             # Получаем полные данные OAuth аккаунта
-            async with self.db.execute("SELECT * FROM oauth_accounts WHERE id = ?", (account_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM oauth_accounts WHERE id = ?", (account_id,)
+            ) as cursor:
                 account = await cursor.fetchone()
 
             return dict(account)
@@ -602,7 +752,9 @@ class DatabaseService:
                 payment_id = result["id"]
 
             # Получаем полные данные платежа
-            async with self.db.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM payments WHERE id = ?", (payment_id,)
+            ) as cursor:
                 payment = await cursor.fetchone()
 
             return dict(payment)
@@ -611,7 +763,9 @@ class DatabaseService:
             logger.error(f"Ошибка при создании платежа: {str(e)}")
             raise
 
-    async def update_payment(self, payment_id: str, payment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_payment(
+        self, payment_id: str, payment_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные платежа.
 
@@ -647,7 +801,9 @@ class DatabaseService:
                 return None
 
             # Получаем обновленные данные
-            async with self.db.execute("SELECT * FROM payments WHERE payment_id = ?", (payment_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
+            ) as cursor:
                 updated_payment = await cursor.fetchone()
 
             return dict(updated_payment) if updated_payment else None
@@ -667,7 +823,9 @@ class DatabaseService:
             Словарь с данными платежа или None, если платеж не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM payments WHERE payment_id = ?", (payment_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM payments WHERE payment_id = ?", (payment_id,)
+            ) as cursor:
                 payment = await cursor.fetchone()
 
             return dict(payment) if payment else None
@@ -676,7 +834,11 @@ class DatabaseService:
             raise
 
     async def get_payments(
-        self, skip: int = 0, limit: int = 100, status: Optional[str] = None, payment_provider: Optional[str] = None
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[str] = None,
+        payment_provider: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает список платежей с учетом параметров фильтрации.
@@ -765,7 +927,9 @@ class DatabaseService:
             Словарь с данными плана подписки или None, если план не найден
         """
         try:
-            async with self.db.execute("SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)
+            ) as cursor:
                 plan = await cursor.fetchone()
 
             return dict(plan) if plan else None
@@ -799,7 +963,9 @@ class DatabaseService:
                 plan_id = result["id"]
 
             # Получаем полные данные плана
-            async with self.db.execute("SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM subscription_plans WHERE id = ?", (plan_id,)
+            ) as cursor:
                 plan_data = await cursor.fetchone()
 
             return dict(plan_data)
@@ -808,7 +974,9 @@ class DatabaseService:
             logger.error(f"Ошибка при создании плана подписки: {str(e)}")
             raise
 
-    async def update_subscription_plan(self, plan_id: int, plan_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_subscription_plan(
+        self, plan_id: int, plan_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Обновляет данные плана подписки.
 
@@ -878,7 +1046,9 @@ class DatabaseService:
                 subscription_id = result["id"]
 
             # Получаем полные данные подписки
-            async with self.db.execute("SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)
+            ) as cursor:
                 subscription_data = await cursor.fetchone()
 
             return dict(subscription_data)
@@ -898,7 +1068,9 @@ class DatabaseService:
             Словарь с данными подписки или None, если подписка не найдена
         """
         try:
-            async with self.db.execute("SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)) as cursor:
+            async with self.db.execute(
+                "SELECT * FROM subscriptions WHERE id = ?", (subscription_id,)
+            ) as cursor:
                 subscription = await cursor.fetchone()
 
             return dict(subscription) if subscription else None
@@ -1063,7 +1235,9 @@ class DatabaseService:
             logger.error(f"Ошибка при получении подписок для продления: {str(e)}")
             raise
 
-    async def get_user_subscriptions_history(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_user_subscriptions_history(
+        self, user_id: int, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """
         Получает историю подписок пользователя.
 

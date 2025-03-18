@@ -97,7 +97,7 @@ class AuthService:
                 entity="user",
                 entity_id=username,
                 user_id=username,
-                details="Successful login"
+                details="Successful login",
             )
 
             return user
@@ -106,9 +106,7 @@ class AuthService:
             raise
 
     def create_access_token(
-        self,
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None
+        self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None
     ) -> str:
         """
         Создает JWT токен доступа.
@@ -186,11 +184,7 @@ class AuthService:
             logger.error(f"Ошибка при получении пользователя по токену: {str(e)}")
             return None
 
-    def check_permissions(
-        self,
-        user: Dict[str, Any],
-        required_roles: List[str]
-    ) -> bool:
+    def check_permissions(self, user: Dict[str, Any], required_roles: List[str]) -> bool:
         """
         Проверяет, имеет ли пользователь необходимые роли.
 
@@ -216,11 +210,7 @@ class AuthService:
         return False
 
     async def register_user(
-        self,
-        username: str,
-        password: str,
-        email: Optional[str] = None,
-        roles: List[str] = ["user"]
+        self, username: str, password: str, email: Optional[str] = None, roles: List[str] = ["user"]
     ) -> Dict[str, Any]:
         """
         Регистрирует нового пользователя.
@@ -253,7 +243,7 @@ class AuthService:
                 "email": email,
                 "hashed_password": hashed_password,
                 "is_active": True,
-                "roles": roles
+                "roles": roles,
             }
 
             user = await self.db_service.create_user(user_data)
@@ -264,7 +254,7 @@ class AuthService:
                 entity="user",
                 entity_id=username,
                 user_id="system",
-                details="User registration"
+                details="User registration",
             )
 
             return user
@@ -341,7 +331,7 @@ class AuthService:
                 "name": user_info.get("name", ""),
                 "picture": user_info.get("picture", ""),
                 "is_verified": user_info.get("email_verified", False),
-                "auth_provider": "google"
+                "auth_provider": "google",
             }
             user = await self.create_user(new_user_data)
 
@@ -351,5 +341,5 @@ class AuthService:
         return {
             "user": user,
             "access_token": tokens["access_token"],
-            "refresh_token": tokens["refresh_token"]
+            "refresh_token": tokens["refresh_token"],
         }

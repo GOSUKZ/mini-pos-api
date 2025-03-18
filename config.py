@@ -1,11 +1,12 @@
-import redis.asyncio as redis
 import os
-from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import Dict, List, Optional, Any, ClassVar
+from typing import Any, ClassVar, Dict, List, Optional
+
+import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):

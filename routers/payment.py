@@ -1,4 +1,3 @@
-
 # 2. Добавьте роутер payment.py для обработки платежей
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -13,10 +12,10 @@ router = APIRouter(prefix="/payment", tags=["payment"])
 
 @router.post("/create")
 async def create_payment(
-        amount: float,
-        currency: str = "USD",
-        description: str = "",
-        payment_service: PaymentService = Depends(get_payment_service)
+    amount: float,
+    currency: str = "USD",
+    description: str = "",
+    payment_service: PaymentService = Depends(get_payment_service),
 ):
     """Создание платежа в PayPal."""
     try:
@@ -34,8 +33,7 @@ async def create_payment(
 
 @router.get("/success")
 async def payment_success(
-        token: str,
-        payment_service: PaymentService = Depends(get_payment_service)
+    token: str, payment_service: PaymentService = Depends(get_payment_service)
 ):
     """Обработка успешного платежа."""
     try:
@@ -47,11 +45,7 @@ async def payment_success(
 
         # Здесь можно добавить логику обновления статуса заказа в вашей БД
 
-        return {
-            "status": "success",
-            "order_id": token,
-            "details": payment_result
-        }
+        return {"status": "success", "order_id": token, "details": payment_result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -78,5 +72,3 @@ async def payment_webhook(request: Request):
         pass
 
     return {"status": "webhook received"}
-
-
