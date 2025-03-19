@@ -8,7 +8,7 @@ for working with products. It implements business logic and validation.
 import logging
 from typing import Any, Dict, Optional
 
-from core.database import DatabaseService
+from services.database.base import DatabaseService
 
 logger = logging.getLogger("product_service")
 

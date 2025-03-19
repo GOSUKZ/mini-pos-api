@@ -16,7 +16,7 @@ import jwt
 from passlib.context import CryptContext
 
 from config import get_settings
-from core.database import DatabaseService
+from services.database.user import UsersDataService
 
 logger = logging.getLogger("auth_service")
 settings = get_settings()
@@ -40,7 +40,7 @@ class AuthService:
     Сервис для аутентификации и авторизации пользователей.
     """
 
-    def __init__(self, db_service: DatabaseService):
+    def __init__(self, db_service: UsersDataService):
         """
         Инициализирует сервис с сервисом базы данных.
 

@@ -3,9 +3,9 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 
-from core.database import DatabaseService
 from core.models import User, UserUpdate
 from services.auth_service import AuthService
+from services.database.base import DatabaseService
 from utils.dependencies import (
     get_auth_service,
     get_current_active_user,
@@ -41,7 +41,7 @@ async def update_user_me(
     """
     Обновление данных текущего пользователя.
     """
-    logger.info(f"Обновление данных пользователя {current_user.username}")
+    logger.info("Обновление данных пользователя %s", current_user.username)
 
     try:
         update_data = user_update.model_dump(exclude_unset=True)

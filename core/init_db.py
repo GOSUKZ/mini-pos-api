@@ -1,11 +1,10 @@
 import logging
-from datetime import datetime
 
 import asyncpg
 
 from config import get_settings
-from core.database import DatabaseService
 from services.auth_service import AuthService
+from services.database.base import DatabaseService
 
 # Инициализируем настройки
 settings = get_settings()

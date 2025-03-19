@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from core.database import DatabaseService
 from core.models import User
+from services.database.base import DatabaseService
 from utils.dependencies import get_db_service, has_role
 
 logger = logging.getLogger("audit_router")

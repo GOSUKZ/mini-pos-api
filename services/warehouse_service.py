@@ -1,8 +1,8 @@
 import logging
 from typing import Any, Dict, Optional
 
-from core.database import DatabaseService
 from core.models import Warehouse, WarehouseCreate
+from services.database.base import DatabaseService
 
 logger = logging.getLogger("warehouse_service")
 

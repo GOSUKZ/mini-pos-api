@@ -5,8 +5,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from core.database import DatabaseService
 from core.models import SaleItem
+from services.database.base import DatabaseService
 
 logger = logging.getLogger("sales_service")
 
