@@ -6,14 +6,17 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 
 from config import clear_warehouse_cache
 from core.dtos.warehouse_response_dto import WarehouseResponseDTO
 from core.models import User, Warehouse, WarehouseCreate
 from services.warehouse_service import WarehouseService
-from utils.dependencies import can_read_warehouses, get_warehouse_service
+from utils.dependencies import (
+    can_manage_warehouse,
+    can_read_warehouses,
+    get_warehouse_service,
+)
 
 logger = logging.getLogger("warehouse_router")
 
@@ -97,7 +100,7 @@ async def create_warehouse(
 async def read_warehouse(
     warehouse_id: int = Path(..., ge=1),
     warehouse_service: WarehouseService = Depends(get_warehouse_service),
-    current_user: User = Depends(can_read_warehouses),
+    current_user: User = Depends(can_manage_warehouse),
 ):
     """
     Получение склада по ID.
@@ -129,7 +132,7 @@ async def update_warehouse(
     warehouse_id: int = Path(..., ge=1),
     warehouse_update: WarehouseCreate = ...,
     warehouse_service: WarehouseService = Depends(get_warehouse_service),
-    current_user: User = Depends(can_read_warehouses),
+    current_user: User = Depends(can_manage_warehouse),
 ):
     """
     Обновление склада по ID.
@@ -172,7 +175,7 @@ async def update_warehouse(
 async def delete_warehouse(
     warehouse_id: int = Path(..., ge=1),
     warehouse_service: WarehouseService = Depends(get_warehouse_service),
-    current_user: User = Depends(can_read_warehouses),
+    current_user: User = Depends(can_manage_warehouse),
 ):
     """
     Удаление склада по ID.

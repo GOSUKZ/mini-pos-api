@@ -91,7 +91,7 @@ async def custom_middleware(request: Request, call_next):
 
 # Обработчик ошибок валидации
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(exc: RequestValidationError):
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
     Handles validation errors for incoming requests.
 

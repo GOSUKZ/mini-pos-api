@@ -216,7 +216,7 @@ async def can_manage_warehouse(
         return current_user
 
     warehouse = await warehouse_service.get_warehouse_by_id(warehouse_id)
-    if not warehouse or warehouse.user_id != current_user.id:
+    if not warehouse or warehouse.get("user_id") != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для управления этим складом",
