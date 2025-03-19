@@ -52,7 +52,7 @@ class ProductService:
                 action="read",
                 entity="product",
                 entity_id=str(product.get("id", "")),
-                user_id=current_user.get("username", ""),
+                user_id=str(current_user.get("username", "")),
                 details=f"Get product by barcode: {barcode}",
             )
 
@@ -120,7 +120,7 @@ class ProductService:
                     action="read",
                     entity="products",
                     entity_id="list",
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Retrieved products list with params: limit={limit}, skip={skip}",
                 )
 
@@ -152,7 +152,7 @@ class ProductService:
                     action="read",
                     entity="product",
                     entity_id=str(product_id),
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Retrieved product: {product.get('sku_name', '')}",
                 )
 
@@ -197,7 +197,7 @@ class ProductService:
                     action="create",
                     entity="product",
                     entity_id=str(product.get("id", "")),
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Created product: {product.get('sku_name', '')}",
                 )
 
@@ -253,7 +253,7 @@ class ProductService:
                     action="update",
                     entity="product",
                     entity_id=str(product_id),
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Updated product: {updated_product.get('sku_name', '')}, fields: {', '.join(product_data.keys())}",
                 )
 
@@ -291,7 +291,7 @@ class ProductService:
                     action="delete",
                     entity="product",
                     entity_id=str(product_id),
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Deleted product: {product_name}",
                 )
 
@@ -311,6 +311,7 @@ class ProductService:
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        warehouse_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Получает список локальных продуктов пользователя с фильтрацией и сортировкой.
@@ -333,6 +334,7 @@ class ProductService:
                 department=department,
                 min_price=min_price,
                 max_price=max_price,
+                warehouse_id=warehouse_id,
             )
 
             products = await self.db_service.get_local_products(
@@ -345,6 +347,7 @@ class ProductService:
                 department=department,
                 min_price=min_price,
                 max_price=max_price,
+                warehouse_id=warehouse_id,
             )
 
             current_page = (skip // limit) + 1 if limit > 0 else 1
@@ -416,7 +419,7 @@ class ProductService:
                 action="create",
                 entity="product",
                 entity_id=str(product.get("id", "")),
-                user_id=user_id,
+                user_id=str(user_id),
                 details=f"Created product: {product.get('sku_name', '')}",
             )
 
@@ -472,7 +475,7 @@ class ProductService:
                     action="update",
                     entity="product",
                     entity_id=str(product_id),
-                    user_id=current_user.get("username", "unknown"),
+                    user_id=str(current_user.get("username", "unknown")),
                     details=f"Updated product: {updated_product.get('sku_name', '')}, fields: {', '.join(product_data.keys())}",
                 )
 

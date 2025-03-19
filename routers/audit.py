@@ -55,7 +55,7 @@ async def get_audit_logs(
             action="read",
             entity="audit_logs",
             entity_id="list",
-            user_id=current_user.username,
+            user_id=str(current_user.id),
             details=f"Retrieved audit logs with filters: entity={entity}, action={action}, user_id={user_id}",
         )
 

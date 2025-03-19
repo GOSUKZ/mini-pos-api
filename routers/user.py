@@ -1,10 +1,17 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Path
 import logging
-from utils.dependencies import get_db_service, get_auth_service, has_role, get_current_active_user
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+
 from core.database import DatabaseService
-from services.auth_service import AuthService
 from core.models import User, UserUpdate
+from services.auth_service import AuthService
+from utils.dependencies import (
+    get_auth_service,
+    get_current_active_user,
+    get_db_service,
+    has_role,
+)
 
 logger = logging.getLogger("user_router")
 
@@ -61,7 +68,7 @@ async def update_user_me(
             action="update",
             entity="user",
             entity_id=current_user.username,
-            user_id=current_user.username,
+            user_id=str(current_user.id),
             details=f"Updated own profile, fields: {', '.join(update_data.keys())}",
         )
 
@@ -130,7 +137,7 @@ async def update_user(
             action="update",
             entity="user",
             entity_id=username,
-            user_id=current_user.username,
+            user_id=str(current_user.id),
             details=f"Admin updated user {username}, fields: {', '.join(update_data.keys())}",
         )
 

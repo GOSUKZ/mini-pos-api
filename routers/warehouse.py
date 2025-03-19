@@ -96,6 +96,38 @@ async def create_warehouse(
         )
 
 
+@router.post(
+    "/{warehouse_id}/add-product/{product_id}/{quantity}",
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_product_to_warehouse(
+    warehouse_id: int = Path(..., ge=1),
+    product_id: int = Path(..., ge=1),
+    quantity: int = Path(..., ge=1),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    current_user: User = Depends(can_manage_warehouse),
+):
+    """
+    Добавление товара в склад.
+    """
+
+    logger.info(
+        "Добавление товара в склад %s пользователем %s", warehouse_id, current_user.username
+    )
+    try:
+        warehouse = await warehouse_service.add_product_to_warehouse(
+            warehouse_id, product_id, quantity
+        )
+        return {"message": "Product added"}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error("Ошибка при добавлении товара в склад %s: %s", warehouse_id, str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        )
+
+
 @router.get("/{warehouse_id}", response_model=Warehouse)
 async def read_warehouse(
     warehouse_id: int = Path(..., ge=1),

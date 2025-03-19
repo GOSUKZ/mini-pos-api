@@ -123,6 +123,7 @@ class DatabaseService:
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        warehouse_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает список локальных товаров пользователя с фильтрами и сортировкой.
@@ -166,6 +167,13 @@ class DatabaseService:
         if max_price is not None:
             query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
+
+        if warehouse_id is not None:
+            query_parts.append(
+                f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
+            )
+            params.append(warehouse_id)
             param_index += 1
 
         valid_columns = [
@@ -261,6 +269,7 @@ class DatabaseService:
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        warehouse_id: Optional[int] = None,
     ) -> int:
         """
         Получает общее количество товаров пользователя с учетом фильтрации.
@@ -300,6 +309,13 @@ class DatabaseService:
         if max_price is not None:
             query_parts.append(f"AND price <= ${param_index}")
             params.append(max_price)
+            param_index += 1
+
+        if warehouse_id is not None:
+            query_parts.append(
+                f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
+            )
+            params.append(warehouse_id)
             param_index += 1
 
         query = " ".join(query_parts)
@@ -1585,3 +1601,62 @@ class DatabaseService:
         except Exception as e:
             logger.error("Ошибка при удалении склада с ID %s: %s", warehouse_id, e)
             raise
+
+    async def add_product_to_warehouse(
+        self, warehouse_id: int, product_id: int, quantity: int
+    ) -> bool:
+        """
+        Добавляет продукт в склад.
+
+        Args:
+            warehouse_id: ID склада
+            product_id: ID продукта
+
+        Returns:
+            True, если продукт успешно добавлен, иначе False
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    # Проверяем, есть ли уже этот товар на складе
+                    existing_quantity = await conn.fetchval(
+                        """
+                        SELECT quantity FROM warehouse_products 
+                        WHERE warehouse_id = $1 AND product_id = $2
+                        """,
+                        warehouse_id,
+                        product_id,
+                    )
+
+                    if existing_quantity is not None:
+                        # Если товар уже есть, обновляем количество
+                        await conn.execute(
+                            """
+                            UPDATE warehouse_products 
+                            SET quantity = $1 
+                            WHERE warehouse_id = $2 AND product_id = $3
+                            """,
+                            quantity,
+                            warehouse_id,
+                            product_id,
+                        )
+                    else:
+                        # Если товара нет, создаем новую запись
+                        await conn.execute(
+                            """
+                            INSERT INTO warehouse_products (warehouse_id, product_id, quantity) 
+                            VALUES ($1, $2, $3)
+                            """,
+                            warehouse_id,
+                            product_id,
+                            quantity,
+                        )
+
+            logger.info(
+                "Продукт %s успешно добавлен/обновлен на складе %s", product_id, warehouse_id
+            )
+            return True
+
+        except Exception as e:
+            logger.error("Ошибка при добавлении продукта в склад с ID %s: %s", warehouse_id, e)
+            return False

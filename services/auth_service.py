@@ -105,7 +105,7 @@ class AuthService:
                 action="login",
                 entity="user",
                 entity_id=username,
-                user_id=username,
+                user_id=str(username),
                 details="Successful login",
             )
 
@@ -261,7 +261,7 @@ class AuthService:
             await self.db_service.add_audit_log(
                 action="create",
                 entity="user",
-                entity_id=username,
+                entity_id=str(username),
                 user_id="system",
                 details="User registration",
             )

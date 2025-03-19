@@ -213,6 +213,22 @@ class WarehouseService:
             logger.error("Ошибка при удалении склада с ID %s: %s", warehouse_id, str(e))
             raise
 
+    async def add_product_to_warehouse(
+        self, warehouse_id: int, product_id: int, quantity: int
+    ) -> bool:
+        """
+        Добавляет продукт в склад.
+        """
+
+        try:
+            result = await self.db_service.add_product_to_warehouse(
+                warehouse_id, product_id, quantity
+            )
+            return result
+        except Exception as e:
+            logger.error("Ошибка при добавлении продукта в склад с ID %s: %s", warehouse_id, str(e))
+            raise
+
     def _validate_warehouse_data(self, warehouse_data: WarehouseCreate) -> None:
         """
         Проверяет данные склада на соответствие бизнес-правилам.

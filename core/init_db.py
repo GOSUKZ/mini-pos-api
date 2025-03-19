@@ -45,6 +45,15 @@ TABLES = {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """,
+    "warehouse_products": """
+        CREATE TABLE IF NOT EXISTS warehouse_products (
+            id SERIAL PRIMARY KEY,
+            warehouse_id INTEGER NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES local_products(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (warehouse_id, product_id)
+        )
+    """,
     "users": """
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
