@@ -34,6 +34,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi_cache.decorator import cache
 
 from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User
@@ -51,12 +52,13 @@ router = APIRouter(
 
 
 @router.get("/", response_model=ProductResponseDTO)
+@cache(expire=60, namespace="local-products")
 async def read_products(
     skip: int = 0,
     limit: int = 100,
     search: Optional[str] = None,
     sort_by: Optional[str] = None,
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     department: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,

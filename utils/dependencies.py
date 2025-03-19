@@ -16,10 +16,10 @@ from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from config import get_settings
 from core.database import DatabaseService
 from core.models import User
-from main import app
 from services.auth_service import AuthService
 from services.payment_service import PaymentService
 from services.product_service import ProductService
+from services.warehouse_service import WarehouseService
 
 logger = logging.getLogger("dependencies")
 
@@ -36,6 +36,7 @@ def get_db():
     Получает соединение с базой данных из состояния приложения.
     Используется как зависимость.
     """
+    from main import app
 
     # pylint: disable=no-member
     return app.db_pool
@@ -55,6 +56,14 @@ def get_product_service(db_service=Depends(get_db_service)):
     Используется как зависимость.
     """
     return ProductService(db_service)
+
+
+def get_warehouse_service(db_service=Depends(get_db_service)):
+    """
+    Создает и возвращает сервис складов.
+    Используется как зависимость.
+    """
+    return WarehouseService(db_service)
 
 
 def get_sync_auth_service(db_service=Depends(get_db_service)):
@@ -146,10 +155,71 @@ def get_payment_service():
     return PaymentService()
 
 
-# Удалите вызов get_auth_service() в конце файла
 async def can_read_products(current_user: User = Depends(get_current_active_user)) -> User:
     """
     Проверяет, что пользователь может читать данные о товарах.
     Любой активный и аутентифицированный пользователь имеет право на чтение.
     """
+    return current_user
+
+
+async def can_read_warehouses(current_user: User = Depends(get_current_active_user)) -> User:
+    """
+    Проверяет, что пользователь может читать данные о складах.
+    Любой активный и аутентифицированный пользователь имеет право на чтение.
+    """
+    return current_user
+
+
+async def can_manage_product(
+    product_id: int,
+    current_user: User = Depends(get_current_active_user),
+    product_service: ProductService = Depends(get_product_service),
+) -> User:
+    """
+    Проверяет, может ли пользователь управлять данным продуктом.
+
+    - Администратор имеет полный доступ.
+    - Владелец товара может управлять только своими товарами.
+
+    Raises:
+        HTTPException: если доступ запрещен.
+    """
+    if "admin" in current_user.roles:
+        return current_user
+
+    product = await product_service.get_product_by_id(product_id)
+    if not product or product.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для управления этим товаром",
+        )
+
+    return current_user
+
+
+async def can_manage_warehouse(
+    warehouse_id: int,
+    current_user: User = Depends(get_current_active_user),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+) -> User:
+    """
+    Проверяет, может ли пользователь управлять данным складом.
+
+    - Администратор имеет полный доступ.
+    - Владелец склада может управлять только своими складами.
+
+    Raises:
+        HTTPException: если доступ запрещен.
+    """
+    if "admin" in current_user.roles:
+        return current_user
+
+    warehouse = await warehouse_service.get_warehouse_by_id(warehouse_id)
+    if not warehouse or warehouse.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для управления этим складом",
+        )
+
     return current_user

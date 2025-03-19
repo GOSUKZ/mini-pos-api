@@ -53,13 +53,13 @@ async def read_product_by_barcode(
 
 
 @router.get("/", response_model=ProductResponseDTO)
-@cache(expire=60)
+@cache(expire=60, namespace="global-products")
 async def read_products(
     skip: int = 0,
     limit: int = 100,
     search: Optional[str] = None,
     sort_by: Optional[str] = None,
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     department: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,

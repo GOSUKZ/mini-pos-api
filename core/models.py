@@ -440,7 +440,7 @@ class AuditLog(BaseModel):
     action: str
     entity: str
     entity_id: str
-    user_id: str
+    user_id: int
     timestamp: datetime
     details: Optional[str] = None
 
@@ -463,7 +463,7 @@ class OAuthAccountBase(BaseModel):
     """Базовая модель OAuth аккаунта"""
 
     provider: str
-    provider_user_id: str
+    provider_user_id: int
     access_token: str
     refresh_token: Optional[str] = None
     expires_at: Optional[datetime] = None
@@ -776,9 +776,6 @@ class Subscription(SubscriptionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Модели запросов на подписку ---
-
-
 class SubscriptionRequest(BaseModel):
     """Модель запроса на создание подписки"""
 
@@ -795,3 +792,19 @@ class SubscriptionResponse(BaseModel):
     start_date: datetime
     end_date: datetime
     payment_url: str
+
+
+class Warehouse(BaseModel):
+    """Модель склада с ID"""
+
+    id: Optional[int] = None
+    user_id: int
+    name: str
+    location: str
+
+
+class WarehouseCreate(BaseModel):
+    """Модель создания склада"""
+
+    name: str
+    location: str

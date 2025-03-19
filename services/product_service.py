@@ -302,7 +302,7 @@ class ProductService:
 
     async def get_local_products(
         self,
-        user_id: str,
+        user_id: int,
         skip: int = 0,
         limit: int = 100,
         search: Optional[str] = None,
@@ -385,7 +385,7 @@ class ProductService:
             raise
 
     async def create_local_product(
-        self, product_data: Dict[str, Any], user_id: str
+        self, product_data: Dict[str, Any], user_id: int
     ) -> Dict[str, Any]:
         """
         Создает новый локальный продукт.

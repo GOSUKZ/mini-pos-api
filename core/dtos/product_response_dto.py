@@ -1,5 +1,10 @@
-from core.models import Product
+"""
+Модель ответа с информацией о товаре.
+"""
+
 from pydantic import BaseModel
+
+from core.models import Product
 
 
 class ProductResponseDTO(BaseModel):
