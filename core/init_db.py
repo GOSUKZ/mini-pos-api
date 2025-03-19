@@ -70,7 +70,7 @@ TABLES = {
     "local_products": """
         CREATE TABLE IF NOT EXISTS local_products (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             sku_code VARCHAR,
             barcode VARCHAR,
             unit VARCHAR,
@@ -98,18 +98,45 @@ TABLES = {
             UNIQUE (provider, provider_user_id)
         )
     """,
-    "payments": """
-        CREATE TABLE IF NOT EXISTS payments (
+    "sales": """
+        CREATE TABLE IF NOT EXISTS sales (
             id SERIAL PRIMARY KEY,
-            order_id VARCHAR,
-            payment_provider VARCHAR,
-            payment_id VARCHAR UNIQUE,
-            amount NUMERIC,
-            currency VARCHAR DEFAULT 'USD',
-            status VARCHAR,
+            order_id VARCHAR UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            total_amount NUMERIC NOT NULL,
+            currency VARCHAR NOT NULL DEFAULT 'KZT',
+            status VARCHAR NOT NULL DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            details VARCHAR
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+    "order_counter": """
+        CREATE TABLE IF NOT EXISTS order_counter (
+            id SERIAL PRIMARY KEY,
+            last_number INTEGER NOT NULL DEFAULT 10000
+        )
+    """,
+    "sales_items": """
+        CREATE TABLE IF NOT EXISTS sales_items (
+            id SERIAL PRIMARY KEY,
+            sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES local_products(id),
+            warehouse_id INTEGER NULL REFERENCES warehouses(id) ON DELETE SET NULL, -- склад теперь необязателен
+            quantity INTEGER NOT NULL,
+            price NUMERIC NOT NULL,
+            cost_price NUMERIC NOT NULL,
+            total NUMERIC NOT NULL
+        )
+    """,
+    "receipts": """
+        CREATE TABLE IF NOT EXISTS receipts (
+            id SERIAL PRIMARY KEY,
+            order_id VARCHAR NOT NULL REFERENCES sales(order_id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            total_amount NUMERIC NOT NULL,
+            currency VARCHAR NOT NULL DEFAULT 'KZT',
+            payment_method VARCHAR NOT NULL,  -- Например: "cash", "card", "bank_transfer"
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """,
     "audit_log": """
@@ -123,67 +150,7 @@ TABLES = {
             details VARCHAR
         )
     """,
-    "subscriptions": """
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            plan_type VARCHAR NOT NULL,
-            status VARCHAR NOT NULL,
-            start_date TIMESTAMP NOT NULL,
-            end_date TIMESTAMP NOT NULL,
-            last_payment_id VARCHAR,
-            next_payment_date TIMESTAMP,
-            auto_renew BOOLEAN DEFAULT TRUE,
-            amount NUMERIC NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """,
-    "subscription_plans": """
-        CREATE TABLE IF NOT EXISTS subscription_plans (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR NOT NULL,
-            plan_type VARCHAR NOT NULL,
-            price NUMERIC NOT NULL,
-            description VARCHAR,
-            features VARCHAR,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """,
 }
-
-SUBSCRIPTION_PLANS = [
-    (
-        "Basic Monthly",
-        "monthly",
-        9.99,
-        "Базовая месячная подписка",
-        "Базовый функционал, Поддержка по email",
-    ),
-    (
-        "Basic Annual",
-        "annual",
-        99.99,
-        "Базовая годовая подписка",
-        "Базовый функционал, Поддержка по email, Скидка 17%",
-    ),
-    (
-        "Premium Monthly",
-        "monthly",
-        19.99,
-        "Премиум месячная подписка",
-        "Все функции, Приоритетная поддержка, Доп. возможности",
-    ),
-    (
-        "Premium Annual",
-        "annual",
-        199.99,
-        "Премиум годовая подписка",
-        "Все функции, Приоритетная поддержка, Доп. возможности, Скидка 17%",
-    ),
-]
 
 
 async def create_database():
@@ -192,22 +159,7 @@ async def create_database():
     async with conn.acquire() as connection:
         for table, query in TABLES.items():
             await connection.execute(query)
-            logger.info(f"Таблица {table} проверена/создана")
-
-        count = await connection.fetchval("SELECT COUNT(*) FROM subscription_plans")
-        if count == 0:
-            now = datetime.utcnow()
-            await connection.executemany(
-                """
-                INSERT INTO subscription_plans (name, plan_type, price, description, features, is_active, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, TRUE, $6, $6)
-                """,
-                [
-                    (name, plan_type, price, desc, features, now)
-                    for name, plan_type, price, desc, features in SUBSCRIPTION_PLANS
-                ],
-            )
-            logger.info("Созданы стандартные планы подписки")
+            logger.info("Таблица %s проверена/создана", table)
 
         admin_count = await connection.fetchval(
             "SELECT COUNT(*) FROM users WHERE roles LIKE '%admin%'"
@@ -225,4 +177,8 @@ async def create_database():
                 "admin",
             )
             logger.info("Создан пользователь admin с ролью администратора")
+
+        last_number = await connection.fetchval("SELECT last_number FROM order_counter")
+        if last_number is None:
+            await connection.execute("INSERT INTO order_counter (last_number) VALUES ($1)", 10000)
     return conn

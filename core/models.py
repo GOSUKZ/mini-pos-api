@@ -15,6 +15,7 @@
 
 import re
 from datetime import datetime
+from enum import Enum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -612,188 +613,6 @@ class GoogleUserInfo(BaseModel):
     sub: str  # ID пользователя в Google
 
 
-class SubscriptionPlanBase(BaseModel):
-    """Базовая модель плана подписки"""
-
-    name: str
-    plan_type: Literal["monthly", "annual"]
-    price: float
-    description: Optional[str] = None
-    features: Optional[str] = None
-    is_active: bool = True
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-    )
-
-    @field_validator("price")
-    @classmethod
-    def validate_price(cls, v: float) -> float:
-        """
-        Validate the price of the subscription plan.
-
-        This method ensures that the price of the subscription plan is not negative.
-        If the condition is not met, it raises a ValueError.
-
-        Args:
-            v (float): The price of the subscription plan to validate.
-
-        Returns:
-            float: The validated and rounded price of the subscription plan.
-        """
-        if v < 0:
-            raise ValueError("Цена не может быть отрицательной")
-        return round(v, 2)
-
-
-class SubscriptionPlanCreate(SubscriptionPlanBase):
-    """Модель создания плана подписки"""
-
-
-class SubscriptionPlanUpdate(BaseModel):
-    """Модель обновления плана подписки"""
-
-    name: Optional[str] = None
-    price: Optional[float] = None
-    description: Optional[str] = None
-    features: Optional[str] = None
-    is_active: Optional[bool] = None
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-    )
-
-    @field_validator("price")
-    @classmethod
-    def validate_price(cls, v: Optional[float]) -> Optional[float]:
-        """
-        Validate the price of the subscription plan.
-
-        This method ensures that the price of the subscription plan is not negative.
-        If the condition is not met, it raises a ValueError.
-
-        Args:
-            v (Optional[float]): The price of the subscription plan to validate.
-
-        Returns:
-            Optional[float]: The validated and rounded price of the subscription plan.
-        """
-        if v is not None:
-            # Check if the price is negative
-            if v < 0:
-                raise ValueError("Цена не может быть отрицательной")
-            # Round the price to two decimal places
-            return round(v, 2)
-        return v
-
-
-class SubscriptionPlan(SubscriptionPlanBase):
-    """Полная модель плана подписки с ID"""
-
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# --- Модели подписок ---
-
-
-class SubscriptionBase(BaseModel):
-    """Базовая модель подписки"""
-
-    user_id: int
-    plan_type: Literal["monthly", "annual"]
-    status: Literal["active", "expired", "cancelled", "pending"]
-    start_date: datetime
-    end_date: datetime
-    auto_renew: bool = True
-    amount: float
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-    )
-
-    @field_validator("amount")
-    @classmethod
-    def validate_amount(cls, v: float) -> float:
-        """
-        Validate the amount of the subscription.
-
-        This method ensures that the amount of the subscription is not negative.
-        If the condition is not met, it raises a ValueError.
-
-        Args:
-            v (float): The amount of the subscription to validate.
-
-        Returns:
-            float: The validated and rounded amount of the subscription.
-        """
-        if v < 0:
-            raise ValueError("Сумма не может быть отрицательной")
-        # Round the amount to two decimal places
-        return round(v, 2)
-
-
-class SubscriptionCreate(SubscriptionBase):
-    """Модель создания подписки"""
-
-    last_payment_id: Optional[str] = None
-    next_payment_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class SubscriptionUpdate(BaseModel):
-    """Модель обновления подписки"""
-
-    status: Optional[Literal["active", "expired", "cancelled", "pending"]] = None
-    end_date: Optional[datetime] = None
-    last_payment_id: Optional[str] = None
-    next_payment_date: Optional[datetime] = None
-    auto_renew: Optional[bool] = None
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-    )
-
-
-class Subscription(SubscriptionBase):
-    """Полная модель подписки с ID"""
-
-    id: int
-    last_payment_id: Optional[str] = None
-    next_payment_date: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class SubscriptionRequest(BaseModel):
-    """Модель запроса на создание подписки"""
-
-    plan_id: int
-    auto_renew: bool = True
-
-
-class SubscriptionResponse(BaseModel):
-    """Модель ответа с информацией о подписке и ссылкой на оплату"""
-
-    subscription_id: int
-    plan_name: str
-    amount: float
-    start_date: datetime
-    end_date: datetime
-    payment_url: str
-
-
 class Warehouse(BaseModel):
     """Модель склада с ID"""
 
@@ -808,3 +627,25 @@ class WarehouseCreate(BaseModel):
 
     name: str
     location: str
+
+
+class SaleItem(BaseModel):
+    product_id: int
+    quantity: int
+    price: float
+    cost_price: float
+    warehouse_id: Optional[str] = None
+
+
+class PaymentMethod(str, Enum):
+    CASH = "cash"
+    CARD = "card"
+    BANK_TRANSFER = "bank_transfer"
+    OTHER = "other"
+
+
+class Currency(str, Enum):
+    KZT = "KZT"
+    USD = "USD"
+    EUR = "EUR"
+    RUB = "RUB"

@@ -17,8 +17,8 @@ from config import get_settings
 from core.database import DatabaseService
 from core.models import User
 from services.auth_service import AuthService
-from services.payment_service import PaymentService
 from services.product_service import ProductService
+from services.sales_service import SalesService
 from services.warehouse_service import WarehouseService
 
 logger = logging.getLogger("dependencies")
@@ -150,9 +150,9 @@ def has_role(required_roles: List[str]) -> Callable[[User], Awaitable[User]]:
     return role_checker
 
 
-def get_payment_service():
-    """Dependency для получения экземпляра PaymentService."""
-    return PaymentService()
+def get_sales_service(db_service=Depends(get_db_service)):
+    """Dependency для получения экземпляра SalesService."""
+    return SalesService(db_service)
 
 
 async def can_read_products(current_user: User = Depends(get_current_active_user)) -> User:

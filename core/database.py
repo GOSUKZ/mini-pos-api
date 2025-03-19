@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 
 import asyncpg
 
+from core.models import SaleItem
+
 from .models import Warehouse, WarehouseCreate
 
 logger = logging.getLogger("database_service")
@@ -1064,358 +1066,6 @@ class DatabaseService:
             logger.error("Ошибка при получении списка платежей: %s", e)
             raise
 
-    async def get_subscription_plans(
-        self, skip: int = 0, limit: int = 100, active_only: bool = True
-    ) -> List[Dict[str, Any]]:
-        """
-        Получает список планов подписок.
-
-        Args:
-            skip: Количество записей для пропуска (пагинация)
-            limit: Максимальное количество записей для возврата
-            active_only: Показывать только активные планы
-
-        Returns:
-            Список словарей с данными планов подписок
-        """
-        query_parts = ["SELECT * FROM subscription_plans"]
-        conditions = []
-        params = []
-
-        if active_only:
-            conditions.append(f"is_active = ${len(params) + 1}")
-            params.append(True)
-
-        if conditions:
-            query_parts.append("WHERE " + " AND ".join(conditions))
-
-        query_parts.append(f"ORDER BY price ASC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}")
-        params.extend([limit, skip])
-
-        query = " ".join(query_parts)
-
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(query, *params)
-
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error("Ошибка при получении списка подписок: %s", e)
-            raise
-
-    async def get_subscription_plan_by_id(self, plan_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Получает план подписки по ID.
-
-        Args:
-            plan_id: ID плана подписки
-
-        Returns:
-            Словарь с данными плана подписки или None, если не найден
-        """
-        query = "SELECT * FROM subscription_plans WHERE id = $1"
-
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, plan_id)
-
-            return dict(row) if row else None
-        except Exception as e:
-            logger.error("Ошибка при получении подписки по ID %s: %s", plan_id, e)
-            raise
-
-    async def create_subscription_plan(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Создает новый план подписки.
-
-        Args:
-            plan_data: Словарь с данными плана подписки
-
-        Returns:
-            Словарь с данными созданного плана подписки, включая ID
-        """
-        fields = plan_data.keys()
-        values_placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
-        fields_str = ", ".join(fields)
-
-        query = f"INSERT INTO subscription_plans ({fields_str}) VALUES ({values_placeholders}) RETURNING *"
-
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, *plan_data.values())
-
-            return dict(row)
-        except Exception as e:
-            logger.error("Ошибка при создании подписки: %s", e)
-            raise
-
-    async def update_subscription_plan(
-        self, plan_id: int, plan_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Обновляет данные плана подписки.
-
-        Args:
-            plan_id: ID плана подписки
-            plan_data: Словарь с обновляемыми данными плана подписки
-
-        Returns:
-            Словарь с обновленными данными плана подписки или None, если план не найден
-        """
-        if not plan_data:
-            return await self.get_subscription_plan_by_id(plan_id)
-
-        set_parts = []
-        params = []
-
-        for i, (key, value) in enumerate(plan_data.items(), start=1):
-            set_parts.append(f"{key} = ${i}")
-            params.append(value)
-
-        # Добавляем обновление `updated_at`
-        params.append(datetime.utcnow())
-        set_parts.append(f"updated_at = ${len(params)}")
-
-        # Добавляем `plan_id` в параметры
-        params.append(plan_id)
-        query = f"UPDATE subscription_plans SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
-
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, *params)
-
-            return dict(row) if row else None
-        except Exception as e:
-            logger.error("Ошибка при обновлении подписки с ID %s: %s", plan_id, e)
-            raise
-
-    async def create_subscription(self, subscription_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Создает новую подписку для пользователя.
-
-        Args:
-            subscription_data: Словарь с данными подписки
-
-        Returns:
-            Словарь с данными созданной подписки, включая ID
-        """
-        fields = list(subscription_data.keys())
-        values_placeholders = ", ".join(f"${i+1}" for i in range(len(fields)))
-        fields_str = ", ".join(fields)
-
-        query = (
-            f"INSERT INTO subscriptions ({fields_str}) VALUES ({values_placeholders}) RETURNING *"
-        )
-
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, *subscription_data.values())
-
-            return dict(row)
-        except Exception as e:
-            logger.error("Ошибка при создании подписки: %s", e)
-            raise
-
-    async def get_subscription_by_id(self, subscription_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Получает подписку по ID.
-
-        Args:
-            subscription_id: ID подписки
-
-        Returns:
-            Словарь с данными подписки или None, если подписка не найдена
-        """
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    "SELECT * FROM subscriptions WHERE id = $1", subscription_id
-                )
-
-            return dict(row) if row else None
-        except Exception as e:
-            logger.error("Ошибка при получении подписки по ID %s: %s", subscription_id, str(e))
-            raise
-
-    async def get_user_subscription(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Получает активную подписку пользователя.
-
-        Args:
-            user_id: ID пользователя
-
-        Returns:
-            Словарь с данными подписки или None, если активная подписка не найдена
-        """
-        try:
-            query = """
-            SELECT * FROM subscriptions 
-            WHERE user_id = $1 AND status = 'active' 
-            ORDER BY end_date DESC 
-            LIMIT 1
-            """
-
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, user_id)
-
-            return dict(row) if row else None
-        except Exception as e:
-            logger.error("Ошибка при получении подписки пользователя %s: %s", user_id, e)
-            raise
-
-    async def update_subscription(
-        self, subscription_id: int, subscription_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Обновляет данные подписки.
-
-        Args:
-            subscription_id: ID подписки
-            subscription_data: Словарь с обновляемыми данными подписки
-
-        Returns:
-            Словарь с обновленными данными подписки или None, если подписка не найдена
-        """
-        if not subscription_data:
-            return await self.get_subscription_by_id(subscription_id)
-
-        set_parts = []
-        params = []
-
-        for i, (key, value) in enumerate(subscription_data.items(), start=1):
-            set_parts.append(f"{key} = ${i}")
-            params.append(value)
-
-        # Добавляем обновление updated_at
-        params.append(datetime.utcnow())
-        set_parts.append(f"updated_at = ${len(params)}")
-
-        # Добавляем subscription_id
-        params.append(subscription_id)
-
-        query = (
-            f"UPDATE subscriptions SET {', '.join(set_parts)} WHERE id = ${len(params)} RETURNING *"
-        )
-
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(query, *params)
-
-            return dict(row) if row else None
-        except Exception as e:
-            logger.error("Ошибка при обновлении подписки с ID %s: %s", subscription_id, e)
-            raise
-
-    async def get_expiring_subscriptions(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
-        """
-        Получает подписки, срок действия которых истекает в ближайшие дни.
-
-        Args:
-            days_threshold: Количество дней до истечения срока
-
-        Returns:
-            Список словарей с данными подписок
-        """
-        try:
-
-            current_date = datetime.utcnow()
-            threshold_date = current_date + timedelta(days=days_threshold)
-
-            query = """
-            SELECT * FROM subscriptions 
-            WHERE status = 'active' AND end_date <= $1 AND end_date >= $2
-            ORDER BY end_date ASC
-            """
-
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(query, threshold_date, current_date)
-
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error("Ошибка при получении истекающих подписок: %s", e)
-            raise
-
-    async def get_expired_subscriptions(self) -> List[Dict[str, Any]]:
-        """
-        Получает подписки, срок действия которых истек, но статус все еще 'active'.
-
-        Returns:
-            Список словарей с данными подписок
-        """
-        try:
-            current_date = datetime.utcnow()
-
-            query = """
-            SELECT * FROM subscriptions 
-            WHERE status = 'active' AND end_date < $1
-            ORDER BY end_date ASC
-            """
-
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(query, current_date)
-
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error("Ошибка при получении истекших подписок: %s", e)
-            raise
-
-    async def get_subscriptions_for_renewal(self, days_threshold: int = 3) -> List[Dict[str, Any]]:
-        """
-        Получает подписки с автопродлением, требующие продления в ближайшие дни.
-
-        Args:
-            days_threshold: Количество дней до истечения срока
-
-        Returns:
-            Список словарей с данными подписок
-        """
-        try:
-            current_date = datetime.utcnow()
-            threshold_date = current_date + timedelta(days=days_threshold)
-
-            query = """
-            SELECT * FROM subscriptions 
-            WHERE status = 'active' AND auto_renew = TRUE AND end_date <= $1 AND end_date >= $2
-            ORDER BY end_date ASC
-            """
-
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(query, threshold_date, current_date)
-
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error("Ошибка при получении подписок для продления: %s", e)
-            raise
-
-    async def get_user_subscriptions_history(
-        self, user_id: int, limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """
-        Получает историю подписок пользователя.
-
-        Args:
-            user_id: ID пользователя
-            limit: Максимальное количество записей
-
-        Returns:
-            Список словарей с данными подписок
-        """
-        try:
-            query = """
-            SELECT * FROM subscriptions 
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2
-            """
-
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(query, user_id, limit)
-
-            return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error("Ошибка при получении истории подписок пользователя %s: %s", user_id, e)
-            raise
-
     async def create_warehouse(self, user_id: int, warehouse_data: WarehouseCreate) -> Warehouse:
         """
         Создает новый склад.
@@ -1660,3 +1310,88 @@ class DatabaseService:
         except Exception as e:
             logger.error("Ошибка при добавлении продукта в склад с ID %s: %s", warehouse_id, e)
             return False
+
+    async def generate_order_id(self) -> str:
+        """Генерирует уникальный order_id с инкрементом и префиксом ORD-."""
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                last_number = await conn.fetchval(
+                    "UPDATE order_counter SET last_number = last_number + 1 RETURNING last_number"
+                )
+                return f"ORD-{last_number}"
+
+    async def create_sale(
+        self, user_id: int, items: List[SaleItem], currency: str, payment_method: str
+    ) -> str:
+        """Создание продажу и возвращает order_id"""
+        try:
+            order_id = await self.generate_order_id()
+            total_amount = sum(item.price * item.quantity for item in items)
+
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.execute(
+                        """INSERT INTO sales (order_id, user_id, total_amount, currency, status) VALUES ($1, $2, $3, $4, $5)""",
+                        order_id,
+                        user_id,
+                        total_amount,
+                        currency,
+                        "pending",
+                    )
+
+                    for item in items:
+                        await conn.execute(
+                            """INSERT INTO sales_items (sale_id, product_id, warehouse_id, quantity, price, cost_price, total) VALUES ((SELECT id FROM sales WHERE order_id = $1), $2, $3, $4, $5, $6, $7)""",
+                            order_id,
+                            item.product_id,
+                            item.warehouse_id,
+                            item.quantity,
+                            item.price,
+                            item.cost_price,
+                            item.price * item.quantity,
+                        )
+
+                    await conn.execute(
+                        """INSERT INTO receipts (order_id, user_id, total_amount, payment_method) VALUES ($1, $2, $3, $4)""",
+                        order_id,
+                        user_id,
+                        total_amount,
+                        payment_method,
+                    )
+
+            return order_id
+        except Exception as e:
+            logger.error("Ошибка при создании записи о продаже %s: %s", order_id, str(e))
+            return False
+
+    async def update_sale_status(self, order_id: str, status: str) -> bool:
+        """Обновляет статус продажи"""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.execute(
+                    "UPDATE sales SET status = $1 WHERE order_id = $2", status, order_id
+                )
+            return result == "UPDATE 1"
+        except Exception as e:
+            logger.error("Ошибка при обновлении статуса продажи %s: %s", order_id, str(e))
+            return False
+
+    async def get_sale_details(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Получает детали заказа и товаров в нём."""
+        async with self.pool.acquire() as conn:
+            sale = await conn.fetchrow("SELECT * FROM sales WHERE order_id = $1", order_id)
+
+            if not sale:
+                return None
+
+            items = await conn.fetch("SELECT * FROM sales_items WHERE sale_id = $1", sale["id"])
+
+            return {
+                "order_id": sale["order_id"],
+                "user_id": sale["user_id"],
+                "total_amount": sale["total_amount"],
+                "currency": sale["currency"],
+                "status": sale["status"],
+                "created_at": sale["created_at"],
+                "items": [dict(item) for item in items],
+            }

@@ -22,9 +22,17 @@ from config import get_settings, init_redis
 from core.init_db import create_database
 
 # Импортируем роутеры
-from routers import audit, auth, global_product, local_product, metrics, user, warehouse
+from routers import (
+    audit,
+    auth,
+    global_product,
+    local_product,
+    metrics,
+    sales,
+    user,
+    warehouse,
+)
 from routers.metrics import increment_metric
-from routers.payment import router as payment_router
 
 # Инициализируем настройки
 settings = get_settings()
@@ -150,7 +158,7 @@ app.include_router(local_product.router)
 app.include_router(warehouse.router)
 app.include_router(audit.router)
 app.include_router(user.router)
-app.include_router(payment_router)
+app.include_router(sales.router)
 app.include_router(metrics.router)
 
 
