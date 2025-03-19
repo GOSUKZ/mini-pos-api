@@ -189,7 +189,6 @@ async def delete_warehouse(
 
         await clear_warehouse_cache()
 
-        return None
     except Exception as e:
         logger.error("Ошибка при удалении склада с ID %s: %s", warehouse_id, str(e))
         raise HTTPException(

@@ -204,7 +204,7 @@ class WarehouseService:
                 action="delete",
                 entity="warehouse",
                 entity_id=str(warehouse_id),
-                user_id=warehouse.get("user_id", ""),
+                user_id=str(warehouse.get("user_id", "")),
                 details=f"Deleted warehouse: {warehouse.get('name', '')}",
             )
 

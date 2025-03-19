@@ -53,7 +53,7 @@ async def read_product_by_barcode(
 
 
 @router.get("/", response_model=ProductResponseDTO)
-@cache(expire=60, namespace="global-products")
+@cache(namespace="global-products")
 async def read_products(
     skip: int = 0,
     limit: int = 100,

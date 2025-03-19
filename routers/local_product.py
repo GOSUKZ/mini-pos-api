@@ -52,7 +52,7 @@ router = APIRouter(
 
 
 @router.get("/", response_model=ProductResponseDTO)
-@cache(expire=60, namespace="local-products")
+@cache(namespace="local-products")
 async def read_products(
     skip: int = 0,
     limit: int = 100,
