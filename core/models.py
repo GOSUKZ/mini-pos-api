@@ -23,6 +23,20 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # --- Модели данных продуктов ---
 
 
+class PaymentMethod(str, Enum):
+    CASH = "cash"
+    CARD = "card"
+    BANK_TRANSFER = "bank_transfer"
+    OTHER = "other"
+
+
+class Currency(str, Enum):
+    KZT = "KZT"
+    USD = "USD"
+    EUR = "EUR"
+    RUB = "RUB"
+
+
 class ProductBase(BaseModel):
     """Базовая модель товара с общими полями"""
 
@@ -629,23 +643,31 @@ class WarehouseCreate(BaseModel):
     location: str
 
 
+class OrderItem(BaseModel):
+    id: int
+    sale_id: int
+    product_id: int
+    warehouse_id: Optional[str] = None
+    quantity: int
+    price: float
+    cost_price: float
+    total: float
+
+
+class Sale(BaseModel):
+    order_id: str
+    user_id: int
+    total_amount: float
+    currency: Currency
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    items: List[OrderItem]
+
+
 class SaleItem(BaseModel):
     product_id: int
     quantity: int
     price: float
     cost_price: float
     warehouse_id: Optional[str] = None
-
-
-class PaymentMethod(str, Enum):
-    CASH = "cash"
-    CARD = "card"
-    BANK_TRANSFER = "bank_transfer"
-    OTHER = "other"
-
-
-class Currency(str, Enum):
-    KZT = "KZT"
-    USD = "USD"
-    EUR = "EUR"
-    RUB = "RUB"

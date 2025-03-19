@@ -25,6 +25,51 @@ class SalesService:
         """
         self.db_service = db_service
 
+    async def get_sales(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        warehouse_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        try:
+            total_count = await self.db_service.get_sales_count(
+                user_id=user_id, search=search, warehouse_id=warehouse_id
+            )
+
+            sales = await self.db_service.get_sales(
+                user_id=user_id,
+                skip=skip,
+                limit=limit,
+                search=search,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                warehouse_id=warehouse_id,
+            )
+
+            current_page = (skip // limit) + 1 if limit > 0 else 1
+            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+            is_last = current_page >= total_pages
+
+            response = {
+                "total_count": total_count,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "skip": skip,
+                "is_last": is_last,
+                "content": sales,
+            }
+
+            return response
+
+        except Exception as e:
+            logger.error("Ошибка при получении списка товаров: %s", str(e))
+            raise
+
     async def create_sale(
         self, user_id: int, items: List[SaleItem], currency: str, payment_method: str
     ) -> str:

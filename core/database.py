@@ -1395,3 +1395,105 @@ class DatabaseService:
                 "created_at": sale["created_at"],
                 "items": [dict(item) for item in items],
             }
+
+    async def get_sales_count(
+        self,
+        user_id: int,
+        search: Optional[str] = None,
+        warehouse_id: Optional[int] = None,
+    ) -> int:
+        query_parts = ["SELECT COUNT(*) FROM sales WHERE user_id = $1"]
+        params = [user_id]
+        param_index = 2  # PostgreSQL использует $1, $2, $3...
+
+        if search:
+            query_parts.append(f"AND (order_id ILIKE ${param_index})")
+            search_term = f"%{search}%"
+            params.append(search_term)
+            param_index += 1
+
+        if warehouse_id is not None:
+            query_parts.append(
+                f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
+            )
+            params.append(warehouse_id)
+            param_index += 1
+
+        query = " ".join(query_parts)
+
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(query, *params)
+            return result if result else 0
+        except Exception as e:
+            logger.error("Ошибка при получении количества товаров: %s", e)
+            raise
+
+    async def get_sales(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        warehouse_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        query_parts = ["SELECT * FROM sales WHERE user_id = $1"]
+        params = [user_id]
+        param_index = 2  # PostgreSQL использует $1, $2, $3...
+
+        if search:
+            query_parts.append(f"AND (order_id ILIKE ${param_index})")
+            search_term = f"%{search}%"
+            params.append(search_term)
+            param_index += 1
+
+        if warehouse_id is not None:
+            query_parts.append(
+                f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
+            )
+            params.append(warehouse_id)
+            param_index += 1
+
+        valid_columns = ["id", "order_id", "total_amount", "currency", "status", "created_at"]
+
+        if sort_by and sort_by in valid_columns:
+            sort_order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            query_parts.append(f"ORDER BY {sort_by} {sort_order}")
+        else:
+            query_parts.append("ORDER BY id ASC")
+
+        query_parts.append(f"LIMIT ${param_index} OFFSET ${param_index + 1}")
+        params.extend([limit, skip])
+
+        query = " ".join(query_parts)
+
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+                sales = [dict(row) for row in rows]
+
+                order_ids = [sale["order_id"] for sale in sales]
+
+                if not order_ids:
+                    return sales
+
+                items_query = """SELECT * FROM sales_items WHERE sale_id IN (SELECT id FROM sales WHERE order_id = ANY($1))"""
+                item_rows = await conn.fetch(items_query, order_ids)
+                items = [dict(row) for row in item_rows]
+
+                items_map = {}
+                for item in items:
+                    sale_id = item["sale_id"]
+                    if sale_id not in items_map:
+                        items_map[sale_id] = []
+                    items_map[sale_id].append(item)
+
+                for sale in sales:
+                    sale["items"] = items_map.get(sale["id"], [])
+
+            return sales
+        except Exception as e:
+            logger.error("Ошибка при получении списка товаров: %s", e)
+            raise

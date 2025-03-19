@@ -155,6 +155,14 @@ def get_sales_service(db_service=Depends(get_db_service)):
     return SalesService(db_service)
 
 
+def can_read_sales(current_user: User = Depends(get_current_active_user)) -> User:
+    """
+    Проверяет, что пользователь может читать данные о продажах.
+    Любой активный и аутентифицированный пользователь имеет право на чтение.
+    """
+    return current_user
+
+
 async def can_read_products(current_user: User = Depends(get_current_active_user)) -> User:
     """
     Проверяет, что пользователь может читать данные о товарах.
