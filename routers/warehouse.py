@@ -11,12 +11,8 @@ from fastapi_cache.decorator import cache
 from config import clear_warehouse_cache
 from core.dtos.warehouse_response_dto import WarehouseResponseDTO
 from core.models import User, Warehouse, WarehouseCreate
-from services.warehouse_service import WarehouseService
-from utils.dependencies import (
-    can_manage_warehouse,
-    can_read_warehouses,
-    get_warehouse_service,
-)
+from utils.dependencies import can_manage_warehouse, can_read_warehouses, get_services
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("warehouse_router")
 
@@ -36,7 +32,7 @@ async def get_warehouses(
     search: Optional[str] = None,
     sort_by: Optional[str] = None,
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_warehouses),
 ):
     """
@@ -47,7 +43,7 @@ async def get_warehouses(
     )
 
     try:
-        warehouses = await warehouse_service.get_warehouses(
+        warehouses = await services.get_warehouses(
             user_id=current_user.id,
             skip=skip,
             limit=limit,
@@ -69,7 +65,7 @@ async def get_warehouses(
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_warehouse(
     warehouse: WarehouseCreate,
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_warehouses),
 ):
     """
@@ -80,7 +76,7 @@ async def create_warehouse(
     logger.info("Создание склада пользователем %s", current_user.username)
 
     try:
-        created_warehouse = await warehouse_service.create_warehouse(
+        created_warehouse = await services.create_warehouse(
             warehouse.model_dump(), user_id=current_user.id
         )
 
@@ -104,7 +100,7 @@ async def add_product_to_warehouse(
     warehouse_id: int = Path(..., ge=1),
     product_id: int = Path(..., ge=1),
     quantity: int = Path(..., ge=1),
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_manage_warehouse),
 ):
     """
@@ -115,9 +111,7 @@ async def add_product_to_warehouse(
         "Добавление товара в склад %s пользователем %s", warehouse_id, current_user.username
     )
     try:
-        warehouse = await warehouse_service.add_product_to_warehouse(
-            warehouse_id, product_id, quantity
-        )
+        warehouse = await services.add_product_to_warehouse(warehouse_id, product_id, quantity)
         return {"message": "Product added"}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -131,7 +125,7 @@ async def add_product_to_warehouse(
 @router.get("/{warehouse_id}", response_model=Warehouse)
 async def read_warehouse(
     warehouse_id: int = Path(..., ge=1),
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_manage_warehouse),
 ):
     """
@@ -140,7 +134,7 @@ async def read_warehouse(
     logger.info("Получение склада с ID %s пользователем %s", warehouse_id, current_user.username)
 
     try:
-        warehouse = await warehouse_service.get_warehouse_by_id(warehouse_id)
+        warehouse = await services.get_warehouse_by_id(warehouse_id)
 
         if warehouse is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
@@ -163,7 +157,7 @@ async def read_warehouse(
 async def update_warehouse(
     warehouse_id: int = Path(..., ge=1),
     warehouse_update: WarehouseCreate = ...,
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_manage_warehouse),
 ):
     """
@@ -172,7 +166,7 @@ async def update_warehouse(
     logger.info("Обновление склада с ID %s пользователем %s", warehouse_id, current_user.username)
 
     try:
-        warehouse = await warehouse_service.get_warehouse_by_id(warehouse_id)
+        warehouse = await services.get_warehouse_by_id(warehouse_id)
 
         if not warehouse:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
@@ -180,7 +174,7 @@ async def update_warehouse(
         if warehouse.get("user_id") != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-        updated_warehouse = await warehouse_service.update_warehouse(
+        updated_warehouse = await services.update_warehouse(
             warehouse_id=warehouse_id,
             warehouse_data=warehouse_update.model_dump(exclude_unset=True),
         )
@@ -206,7 +200,7 @@ async def update_warehouse(
 )
 async def delete_warehouse(
     warehouse_id: int = Path(..., ge=1),
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_manage_warehouse),
 ):
     """
@@ -216,7 +210,7 @@ async def delete_warehouse(
     logger.info("Удаление склада с ID %s пользователем %s", warehouse_id, current_user.username)
 
     try:
-        result = await warehouse_service.delete_warehouse(warehouse_id)
+        result = await services.delete_warehouse(warehouse_id)
 
         if not result:  # Если склад не удалось
             logger.info("Не удалось удалить склад с ID %s, возможно, он уже удален", warehouse_id)

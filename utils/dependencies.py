@@ -16,15 +16,11 @@ from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from config import get_settings
 from core.models import User
 from services.auth_service import AuthService
-from services.database.base import DatabaseService
-from services.database.products import ProductsDataService
-from services.database.receipt import ReceiptDataService
-from services.database.sales import SalesDataService
-from services.database.user import UsersDataService
-from services.database.warehouse import WarehousesDataService
 from services.product_service import ProductService
 from services.sales_service import SalesService
 from services.warehouse_service import WarehouseService
+
+from .service_factory import ServiceFactory
 
 logger = logging.getLogger("dependencies")
 
@@ -47,31 +43,11 @@ def get_db():
     return app.db_pool
 
 
-def get_db_service(db=Depends(get_db)):
-    return DatabaseService(db)
+def get_services(db=Depends(get_db)) -> ServiceFactory:
+    return ServiceFactory(db)
 
 
-def get_auth_data_service(db=Depends(get_db)):
-    return UsersDataService(db)
-
-
-def get_warehouse_data_service(db=Depends(get_db)):
-    return WarehousesDataService(db)
-
-
-def get_product_data_service(db=Depends(get_db)):
-    return ProductsDataService(db)
-
-
-def get_sales_data_service(db=Depends(get_db)):
-    return SalesDataService(db)
-
-
-def get_receipt_data_service(db=Depends(get_db)):
-    return ReceiptDataService(db)
-
-
-def get_product_service(db_service=Depends(get_product_data_service)):
+def get_product_service(db_service=Depends(get_services().get_product_data_service)):
     """
     Создает и возвращает сервис товаров.
     Используется как зависимость.
@@ -79,7 +55,7 @@ def get_product_service(db_service=Depends(get_product_data_service)):
     return ProductService(db_service)
 
 
-def get_warehouse_service(db_service=Depends(get_warehouse_data_service)):
+def get_warehouse_service(db_service=Depends(get_services().get_warehouse_data_service)):
     """
     Создает и возвращает сервис складов.
     Используется как зависимость.
@@ -87,7 +63,7 @@ def get_warehouse_service(db_service=Depends(get_warehouse_data_service)):
     return WarehouseService(db_service)
 
 
-def get_sync_auth_service(db_service=Depends(get_auth_data_service)):
+def get_sync_auth_service(db_service=Depends(get_services().get_auth_data_service)):
     """
     Создает и возвращает сервис аутентификации (синхронная версия).
     Используется как зависимость.
@@ -95,7 +71,7 @@ def get_sync_auth_service(db_service=Depends(get_auth_data_service)):
     return AuthService(db_service)
 
 
-async def get_auth_service(db_service=Depends(get_auth_data_service)):
+async def get_auth_service(db_service=Depends(get_services().get_auth_data_service)):
     """
     Создает и возвращает сервис аутентификации (асинхронная версия).
     Используется как зависимость.
@@ -171,7 +147,7 @@ def has_role(required_roles: List[str]) -> Callable[[User], Awaitable[User]]:
     return role_checker
 
 
-def get_sales_service(db_service=Depends(get_sales_data_service)):
+def get_sales_service(db_service=Depends(get_services().get_sales_data_service)):
     """Dependency для получения экземпляра SalesService."""
     return SalesService(db_service)
 

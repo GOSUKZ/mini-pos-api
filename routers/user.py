@@ -4,14 +4,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 
 from core.models import User, UserUpdate
-from services.auth_service import AuthService
 from services.database.base import DatabaseService
-from utils.dependencies import (
-    get_auth_service,
-    get_current_active_user,
-    get_db_service,
-    has_role,
-)
+from utils.dependencies import get_current_active_user, get_services, has_role
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("user_router")
 
@@ -34,8 +29,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 @router.put("/me", response_model=User)
 async def update_user_me(
     user_update: UserUpdate,
-    db_service: DatabaseService = Depends(get_db_service),
-    auth_service: AuthService = Depends(get_auth_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(get_current_active_user),
 ):
     """
@@ -52,11 +46,9 @@ async def update_user_me(
 
         # Хешируем пароль, если он изменяется
         if "password" in update_data:
-            update_data["hashed_password"] = auth_service.get_password_hash(
-                update_data.pop("password")
-            )
+            update_data["hashed_password"] = services.get_password_hash(update_data.pop("password"))
 
-        updated_user = await db_service.update_user(
+        updated_user = await services.update_user(
             username=current_user.username, user_data=update_data
         )
 
@@ -64,7 +56,7 @@ async def update_user_me(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         # Записываем в аудит
-        await db_service.add_audit_log(
+        await services.add_audit_log(
             action="update",
             entity="user",
             entity_id=current_user.username,
@@ -86,7 +78,7 @@ async def update_user_me(
 async def read_users(
     skip: int = 0,
     limit: int = 100,
-    db_service: DatabaseService = Depends(get_db_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin"])),
 ):
     """
@@ -106,8 +98,7 @@ async def read_users(
 async def update_user(
     username: str = Path(..., min_length=3),
     user_update: UserUpdate = ...,
-    db_service: DatabaseService = Depends(get_db_service),
-    auth_service: AuthService = Depends(get_auth_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin"])),
 ):
     """
@@ -118,7 +109,7 @@ async def update_user(
 
     try:
         # Проверяем существование пользователя
-        user = await db_service.get_user_by_username(username)
+        user = await services.get_user_by_username(username)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -126,14 +117,12 @@ async def update_user(
 
         # Хешируем пароль, если он изменяется
         if "password" in update_data:
-            update_data["hashed_password"] = auth_service.get_password_hash(
-                update_data.pop("password")
-            )
+            update_data["hashed_password"] = services.get_password_hash(update_data.pop("password"))
 
-        updated_user = await db_service.update_user(username=username, user_data=update_data)
+        updated_user = await services.update_user(username=username, user_data=update_data)
 
         # Записываем в аудит
-        await db_service.add_audit_log(
+        await services.add_audit_log(
             action="update",
             entity="user",
             entity_id=username,

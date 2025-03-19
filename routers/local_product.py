@@ -38,8 +38,8 @@ from fastapi_cache.decorator import cache
 
 from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User
-from services.product_service import ProductService
-from utils.dependencies import can_read_products, get_product_service
+from utils.dependencies import can_read_products, get_services
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("local_product_router")
 
@@ -63,7 +63,7 @@ async def read_products(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     warehouse_id: Optional[int] = None,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
     """
@@ -74,7 +74,7 @@ async def read_products(
     )
 
     try:
-        products = await product_service.get_local_products(
+        products = await services.get_local_products(
             user_id=current_user.id,
             skip=skip,
             limit=limit,
@@ -100,7 +100,7 @@ async def read_products(
 @router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED)
 async def create_product(
     product: ProductCreate,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
     """
@@ -110,7 +110,7 @@ async def create_product(
     logger.info("Создание товара пользователем %s", current_user.username)
 
     try:
-        created_product = await product_service.create_local_product(
+        created_product = await services.create_local_product(
             product_data=product.model_dump(), user_id=current_user.id
         )
 
@@ -127,7 +127,7 @@ async def create_product(
 @router.get("/{product_id}", response_model=Product)
 async def read_product(
     product_id: int = Path(..., ge=1),
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
     """
@@ -136,7 +136,7 @@ async def read_product(
     logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await product_service.get_local_product(product_id=product_id)
+        product = await services.get_local_product(product_id=product_id)
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -156,7 +156,7 @@ async def read_product(
 async def update_product(
     product_id: int = Path(..., ge=1),
     product_update: ProductUpdate = ...,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
     """
@@ -165,7 +165,7 @@ async def update_product(
     logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await product_service.get_local_product(product_id=product_id)
+        product = await services.get_local_product(product_id=product_id)
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -173,7 +173,7 @@ async def update_product(
         if product.get("user_id") != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-        updated_product = await product_service.update_local_product(
+        updated_product = await services.update_local_product(
             product_id=product_id,
             product_data=product_update.model_dump(exclude_unset=True),
             current_user=current_user.model_dump(),
@@ -198,7 +198,7 @@ async def update_product(
 )
 async def delete_product(
     product_id: int = Path(..., ge=1),
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
     """
@@ -208,7 +208,7 @@ async def delete_product(
     logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await product_service.get_local_product(product_id=product_id)
+        product = await services.get_local_product(product_id=product_id)
     except Exception as e:
         logger.error("Ошибка при поиске товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
@@ -224,7 +224,7 @@ async def delete_product(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     try:
-        result = await product_service.delete_local_product(product_id=product_id)
+        result = await services.delete_local_product(product_id=product_id)
 
         if not result:
             logger.info("Не удалось удалить товар с ID %s, возможно, он уже удален", product_id)

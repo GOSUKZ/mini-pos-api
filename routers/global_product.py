@@ -10,8 +10,8 @@ from fastapi_cache.decorator import cache
 
 from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User
-from services.product_service import ProductService
-from utils.dependencies import get_current_active_user, get_product_service, has_role
+from utils.dependencies import get_current_active_user, get_services, has_role
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("product_router")
 
@@ -26,7 +26,7 @@ router = APIRouter(
 @router.get("/by-barcode/{barcode}", response_model=Product)
 async def read_product_by_barcode(
     barcode: str,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(get_current_active_user),
 ):
     """
@@ -35,7 +35,7 @@ async def read_product_by_barcode(
     logger.info("Поиск товара по штрих-коду %s пользователем %s", barcode, current_user.username)
 
     try:
-        product = await product_service.get_product_by_barcode(
+        product = await services.get_product_by_barcode(
             barcode=barcode, current_user=current_user.model_dump()
         )
 
@@ -63,7 +63,7 @@ async def read_products(
     department: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
@@ -72,7 +72,7 @@ async def read_products(
     logger.info("Получение списка товаров пользователем %s", current_user.username)
 
     try:
-        products = await product_service.get_products(
+        products = await services.get_products(
             skip=skip,
             limit=limit,
             search=search,
@@ -97,7 +97,7 @@ async def read_products(
 @router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED)
 async def create_product(
     product: ProductCreate,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
@@ -107,7 +107,7 @@ async def create_product(
     logger.info("Creating product by user %s", current_user.username)
 
     try:
-        created_product = await product_service.create_product(
+        created_product = await services.create_product(
             product_data=product.model_dump(), current_user=current_user.model_dump()
         )
 
@@ -124,7 +124,7 @@ async def create_product(
 @router.get("/{product_id}", response_model=Product)
 async def read_product(
     product_id: int = Path(..., ge=1),
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
@@ -133,7 +133,7 @@ async def read_product(
     logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await product_service.get_product(
+        product = await services.get_product(
             product_id=product_id, current_user=current_user.model_dump()
         )
 
@@ -152,7 +152,7 @@ async def read_product(
 async def update_product(
     product_id: int = Path(..., ge=1),
     product_update: ProductUpdate = ...,
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin", "manager"])),
 ):
     """
@@ -162,7 +162,7 @@ async def update_product(
     logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        updated_product = await product_service.update_product(
+        updated_product = await services.update_product(
             product_id=product_id,
             product_data=product_update.model_dump(exclude_unset=True),
             current_user=current_user.model_dump(),
@@ -184,7 +184,7 @@ async def update_product(
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
     product_id: int = Path(..., ge=1),
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin"])),
 ):
     """
@@ -194,7 +194,7 @@ async def delete_product(
     logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        result = await product_service.delete_product(
+        result = await services.delete_product(
             product_id=product_id, current_user=current_user.model_dump()
         )
 

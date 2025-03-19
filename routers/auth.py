@@ -21,8 +21,8 @@ from fastapi.responses import RedirectResponse
 
 from config import get_settings
 from core.models import Token, UserCreate, UserLogin
-from services.auth_service import AuthService
-from utils.dependencies import get_auth_service
+from utils.dependencies import get_services
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("auth_router")
 settings = get_settings()
@@ -37,7 +37,8 @@ router = APIRouter(
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(
-    user_data: UserCreate, auth_service: AuthService = Depends(get_auth_service)
+    user_data: UserCreate,
+    services: ServiceFactory = Depends(get_services),
 ):
     """
     Регистрация нового пользователя.
@@ -45,7 +46,7 @@ async def register_user(
     logger.info("Регистрация нового пользователя: %s", user_data.username)
 
     try:
-        user = await auth_service.register_user(
+        user = await services.auth_service.register_user(
             username=user_data.username,
             password=user_data.password,
             email=user_data.email,
@@ -65,7 +66,8 @@ async def register_user(
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
-    form_data: UserLogin, auth_service: AuthService = Depends(get_auth_service)
+    form_data: UserLogin,
+    services: ServiceFactory = Depends(get_services),
 ):
     """
     Получение токена доступа.
@@ -73,7 +75,7 @@ async def login_for_access_token(
     logger.info("Запрос токена для пользователя: %s", form_data.username)
 
     try:
-        user = await auth_service.authenticate_user(
+        user = await services.auth_service.authenticate_user(
             username=form_data.username, password=form_data.password
         )
 
@@ -88,7 +90,7 @@ async def login_for_access_token(
             )
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = auth_service.create_access_token(
+        access_token = services.auth_service.create_access_token(
             data={"sub": user.get("username"), "roles": user.get("roles", [])},
             expires_delta=access_token_expires,
         )
@@ -104,22 +106,24 @@ async def login_for_access_token(
 
 
 @router.get("/google/login")
-async def google_login(auth_service: AuthService = Depends(get_auth_service)):
+async def google_login(
+    services: ServiceFactory = Depends(get_services),
+):
     """Генерирует URL для авторизации через Google и перенаправляет на него."""
-    auth_url = await auth_service.get_google_auth_url()
+    auth_url = await services.auth_service.get_google_auth_url()
     return RedirectResponse(url=auth_url)
 
 
 @router.get("/google/callback")
 async def google_callback(
-    code: str, auth_service: AuthService = Depends(get_auth_service), response: Response = None
+    code: str, services: ServiceFactory = Depends(get_services), response: Response = None
 ):
     """Обрабатывает callback от Google OAuth."""
     if not code:
         raise HTTPException(status_code=400, detail="No authorization code provided")
 
     # Аутентификация через Google
-    auth_result = await auth_service.authenticate_with_google(code)
+    auth_result = await services.auth_service.authenticate_with_google(code)
 
     # Установка cookies с токенами (опционально)
     if response:

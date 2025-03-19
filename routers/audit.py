@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from core.models import User
-from services.database.base import DatabaseService
-from utils.dependencies import get_db_service, has_role
+from utils.dependencies import get_services, has_role
+from utils.service_factory import ServiceFactory
 
 logger = logging.getLogger("audit_router")
 
@@ -30,7 +30,7 @@ async def get_audit_logs(
     to_date: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    db_service: DatabaseService = Depends(get_db_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(has_role(["admin"])),
 ):
     """
@@ -40,7 +40,7 @@ async def get_audit_logs(
     logger.info("Запрос журнала аудита пользователем %s", current_user.username)
 
     try:
-        logs = await db_service.get_audit_logs(
+        logs = await services.db_service.get_audit_logs(
             skip=skip,
             limit=limit,
             entity=entity,
@@ -51,7 +51,7 @@ async def get_audit_logs(
         )
 
         # Записываем в аудит запрос логов
-        await db_service.add_audit_log(
+        await services.db_service.add_audit_log(
             action="read",
             entity="audit_logs",
             entity_id="list",

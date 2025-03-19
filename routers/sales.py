@@ -2,6 +2,7 @@
 роутер для обработки платежей
 """
 
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,16 +10,11 @@ from fastapi_cache.decorator import cache
 
 from core.dtos.sale_response_dto import SaleResponseDTO
 from core.models import Currency, PaymentMethod, SaleItem, User
-from services.sales_service import SalesService
-from utils.dependencies import (
-    can_read_sales,
-    get_current_active_user,
-    get_sales_service,
-)
+from utils.dependencies import can_read_sales, get_current_active_user, get_services
+from utils.service_factory import ServiceFactory
 
 router = APIRouter(prefix="/sales", tags=["Sales"])
 
-import logging
 
 logger = logging.getLogger("sales_router")
 
@@ -32,7 +28,7 @@ async def read_sales(
     sort_by: Optional[str] = None,
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     warehouse_id: Optional[int] = None,
-    sales_service: SalesService = Depends(get_sales_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_sales),
 ):
     """
@@ -43,7 +39,7 @@ async def read_sales(
     )
 
     try:
-        sales = await sales_service.get_sales(
+        sales = await services.get_sales(
             user_id=current_user.id,
             skip=skip,
             limit=limit,
@@ -68,12 +64,12 @@ async def create_payment(
     items: List[SaleItem],
     currency: Currency = Currency.KZT,
     payment_method: PaymentMethod = PaymentMethod.CASH,
-    sales_service: SalesService = Depends(get_sales_service),
+    services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(get_current_active_user),
 ):
     """Создание продажи и чека"""
     try:
-        order_id = await sales_service.create_sale(
+        order_id = await services.create_sale(
             user_id=current_user.id, items=items, currency=currency, payment_method=payment_method
         )
 
@@ -86,11 +82,11 @@ async def create_payment(
 
 
 @router.post("/confirm")
-async def confirm_payment(order_id: str, sales_service: SalesService = Depends(get_sales_service)):
+async def confirm_payment(order_id: str, services: ServiceFactory = Depends(get_services)):
     """
     Подтверждает оплату и создаёт чек.
     """
-    success = await sales_service.confirm_payment(order_id)
+    success = await services.confirm_payment(order_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось подтвердить оплату"
@@ -100,11 +96,11 @@ async def confirm_payment(order_id: str, sales_service: SalesService = Depends(g
 
 
 @router.post("/cancel")
-async def cancel_sale(order_id: str, sales_service: SalesService = Depends(get_sales_service)):
+async def cancel_sale(order_id: str, services: ServiceFactory = Depends(get_services)):
     """
     Отменяет продажу.
     """
-    success = await sales_service.cancel_sale(order_id)
+    success = await services.cancel_sale(order_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось отменить продажу"
@@ -114,11 +110,11 @@ async def cancel_sale(order_id: str, sales_service: SalesService = Depends(get_s
 
 
 @router.get("/{order_id}")
-async def get_sale_info(order_id: str, sales_service: SalesService = Depends(get_sales_service)):
+async def get_sale_info(order_id: str, services: ServiceFactory = Depends(get_services)):
     """
     Получает информацию о продаже.
     """
-    sale_info = await sales_service.get_sale_info(order_id)
+    sale_info = await services.get_sale_info(order_id)
     if not sale_info:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Продажа не найдена")
 

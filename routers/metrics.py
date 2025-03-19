@@ -1,5 +1,12 @@
+"""
+Module for metrics-related endpoints.
+
+This module contains endpoints for retrieving metrics about API usage.
+Currently, it only provides an endpoint for retrieving the number of calls
+to each endpoint.
+"""
+
 from fastapi import APIRouter
-import redis.asyncio as redis
 from fastapi_cache import FastAPICache
 
 router = APIRouter(
