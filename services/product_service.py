@@ -300,7 +300,9 @@ class ProductService:
             logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
             raise
 
-    async def get_all_local_products(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_all_local_products(
+        self, user_id: int, sort_by: Optional[str] = None, sort_order: str = "asc"
+    ) -> List[Dict[str, Any]]:
         """
         Получает все локальные продукты пользователя.
 
@@ -311,7 +313,9 @@ class ProductService:
             Список словарей с данными локальных продуктов
         """
         try:
-            products = await self.db_service.get_all_local_products(user_id=user_id)
+            products = await self.db_service.get_all_local_products(
+                user_id=user_id, sort_by=sort_by, sort_order=sort_order
+            )
             return products
         except Exception as e:
             logger.error("Ошибка при получении локальных продуктов: %s", str(e))

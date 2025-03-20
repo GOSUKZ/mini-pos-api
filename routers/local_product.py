@@ -100,6 +100,8 @@ async def read_products(
 @router.get("/all", response_model=List[LocalProductDTO])
 # @cache(namespace="all-local-products")
 async def read_all_products(
+    sort_by: Optional[str] = None,
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
@@ -113,6 +115,8 @@ async def read_all_products(
     try:
         products = await services.get_product_service().get_all_local_products(
             user_id=current_user.id,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
         return products

@@ -97,7 +97,9 @@ class ProductsDataService(DatabaseService):
             logger.error("Ошибка при получении списка товаров: %s", e)
             raise
 
-    async def get_all_local_products(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_all_local_products(
+        self, user_id: int, sort_by: Optional[str] = None, sort_order: str = "asc"
+    ) -> List[Dict[str, Any]]:
         """
         Получает все локальные продукты пользователя.
 
@@ -107,10 +109,31 @@ class ProductsDataService(DatabaseService):
         Returns:
             Список словарей с данными локальных продуктов
         """
-        query = "SELECT * FROM local_products WHERE user_id = $1"
+        query_parts = ["SELECT * FROM local_products WHERE user_id = $1"]
+        params = [user_id]
+
+        valid_columns = [
+            "id",
+            "sku_code",
+            "sku_name",
+            "price",
+            "cost_price",
+            "quantity",
+            "created_at",
+        ]
+
+        if sort_by and sort_by in valid_columns:
+            sort_order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            query_parts.append(f"ORDER BY {sort_by} {sort_order}")
+        else:
+            query_parts.append("ORDER BY id ASC")
+
+        query = " ".join(query_parts)
+
+        logger.info("Query: %s", query)
 
         try:
-            return await self.fetch_all(query, user_id)
+            return await self.fetch_all(query, *params)
         except Exception as e:
             logger.error("Ошибка при получении локальных продуктов: %s", e)
             raise
