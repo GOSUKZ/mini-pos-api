@@ -178,11 +178,11 @@ class ProductService:
         try:
             # Проверяем уникальность SKU
             existing_product = await self.db_service.get_product_by_sku(
-                product_data.get("sku_code", "")
+                product_data.get("barcode", "")
             )
             if existing_product:
                 raise ValueError(
-                    f"Product with SKU code '{product_data.get('sku_code')}' already exists"
+                    f"Product with SKU code '{product_data.get('barcode')}' already exists"
                 )
 
             # Проверяем бизнес-правила
@@ -226,17 +226,6 @@ class ProductService:
             existing_product = await self.db_service.get_product_by_id(product_id)
             if not existing_product:
                 return None
-
-            # Проверяем уникальность SKU, если он изменяется
-            if (
-                "sku_code" in product_data
-                and product_data["sku_code"] != existing_product["sku_code"]
-            ):
-                sku_product = await self.db_service.get_product_by_sku(product_data["sku_code"])
-                if sku_product and sku_product["id"] != product_id:
-                    raise ValueError(
-                        f"Product with SKU code '{product_data['sku_code']}' already exists"
-                    )
 
             # Объединяем существующие и новые данные для валидации
             merged_data = {**existing_product, **product_data}
@@ -423,11 +412,13 @@ class ProductService:
         """
         try:
             # Проверяем уникальность SKU
-            existing_product = await self.db_service.get_local_product_by_sku(
-                product_data.get("sku_code", ""), user_id=user_id
+            existing_product = await self.db_service.get_local_product_by_barcode(
+                product_data.get("barcode", ""), user_id=user_id
             )
             if existing_product:
-                raise ValueError(f"Продукт с СКУ '{product_data.get('sku_code')}' уже существует")
+                raise ValueError(
+                    f"Продукт с штрих-кодом '{product_data.get('barcode')}' уже существует"
+                )
 
             # Проверяем бизнес-правила
             self._validate_product_data(product_data)
@@ -471,14 +462,11 @@ class ProductService:
                 return None
 
             # Проверяем уникальность SKU, если он изменяется
-            if (
-                "sku_code" in product_data
-                and product_data["sku_code"] != existing_product["sku_code"]
-            ):
-                sku_product = await self.db_service.get_product_by_sku(product_data["sku_code"])
+            if "barcode" in product_data and product_data["barcode"] != existing_product["barcode"]:
+                sku_product = await self.db_service.get_product_by_sku(product_data["barcode"])
                 if sku_product and sku_product["id"] != product_id:
                     raise ValueError(
-                        f"Product with SKU code '{product_data['sku_code']}' already exists"
+                        f"Product with SKU code '{product_data['barcode']}' already exists"
                     )
 
             # Объединяем существующие и новые данные для валидации
@@ -541,10 +529,6 @@ class ProductService:
         if "price" in product_data and "cost_price" in product_data:
             if product_data["price"] < product_data["cost_price"]:
                 raise ValueError("Price cannot be lower than cost price")
-
-        # Проверяем правильность кодов и наименований
-        if "sku_code" in product_data and not product_data["sku_code"]:
-            raise ValueError("SKU code cannot be empty")
 
         if "sku_name" in product_data and not product_data["sku_name"]:
             raise ValueError("Product name cannot be empty")

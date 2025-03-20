@@ -39,15 +39,15 @@ class Currency(str, Enum):
 class ProductBase(BaseModel):
     """Базовая модель товара с общими полями"""
 
-    sku_code: str = Field(..., description="Уникальный код товара")
-    barcode: Optional[str] = Field(None, description="Штрих-код товара")
+    sku_code: Optional[str] = None
+    barcode: str = Field(None, description="Штрих-код товара")
     unit: str = Field(..., description="Единица измерения")
     sku_name: str = Field(..., description="Наименование товара")
-    status_1c: str = Field(..., description="Статус в 1C")
-    department: str = Field(..., description="Отдел")
-    group_name: str = Field(..., description="Группа товаров")
-    subgroup: Optional[str] = Field(None, description="Подгруппа товаров")
-    supplier: str = Field(..., description="Поставщик")
+    status_1c: Optional[str] = None
+    department: Optional[str] = None
+    group_name: Optional[str] = None
+    subgroup: Optional[str] = None
+    supplier: Optional[str] = None
     cost_price: float = Field(..., ge=0, description="Себестоимость")
     price: float = Field(..., ge=0, description="Цена продажи")
 
@@ -56,28 +56,6 @@ class ProductBase(BaseModel):
         validate_default=True,
         validate_assignment=True,
     )
-
-    @field_validator("sku_code")
-    @classmethod
-    def validate_sku_code(cls, v: str) -> str:
-        """
-        Validate and transform the SKU code.
-
-        This method ensures that the SKU code contains only valid characters
-        (letters, numbers, hyphens, and underscores) and converts it to uppercase.
-
-        Args:
-            v (str): The SKU code to validate.
-
-        Returns:
-            str: The validated and transformed SKU code in uppercase.
-
-        Raises:
-            ValueError: If the SKU code contains invalid characters.
-        """
-        if not re.match(r"^[A-Za-z0-9-_]+$", v):
-            raise ValueError("SKU код должен содержать только буквы, цифры, дефисы и подчеркивания")
-        return v.upper()
 
     @field_validator("price", "cost_price")
     @classmethod
@@ -182,32 +160,6 @@ class ProductUpdate(BaseModel):
         validate_default=True,
         validate_assignment=True,
     )
-
-    @field_validator("sku_code")
-    @classmethod
-    def validate_sku_code(cls, v: Optional[str]) -> Optional[str]:
-        """
-        Validate and transform the SKU code.
-
-        This method ensures that the SKU code contains only valid characters
-        (letters, numbers, hyphens, and underscores) and converts it to uppercase.
-
-        Args:
-            v (str): The SKU code to validate.
-
-        Returns:
-            str: The validated and transformed SKU code in uppercase.
-
-        Raises:
-            ValueError: If the SKU code contains invalid characters.
-        """
-        if v is not None:
-            if not re.match(r"^[A-Za-z0-9-_]+$", v):
-                raise ValueError(
-                    "SKU код должен содержать только буквы, цифры, дефисы и подчеркивания"
-                )
-            return v.upper()
-        return v
 
     @field_validator("cost_price", "price")
     @classmethod

@@ -21,8 +21,8 @@ TABLES = {
     "products": """
         CREATE TABLE IF NOT EXISTS products (
             id SERIAL PRIMARY KEY,
-            sku_code VARCHAR UNIQUE,
-            barcode VARCHAR,
+            sku_code VARCHAR,
+            barcode VARCHAR UNIQUE,
             unit VARCHAR,
             sku_name VARCHAR,
             status_1c VARCHAR,
@@ -71,7 +71,7 @@ TABLES = {
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),
             sku_code VARCHAR,
-            barcode VARCHAR,
+            barcode VARCHAR UNIQUE,
             unit VARCHAR,
             sku_name VARCHAR,
             status_1c VARCHAR,

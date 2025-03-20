@@ -72,6 +72,7 @@ class ProductsDataService(DatabaseService):
             "id",
             "sku_code",
             "sku_name",
+            "barcode",
             "price",
             "cost_price",
             "supplier",
@@ -117,6 +118,7 @@ class ProductsDataService(DatabaseService):
             "sku_code",
             "sku_name",
             "price",
+            "barcode",
             "cost_price",
             "quantity",
             "created_at",
@@ -206,6 +208,7 @@ class ProductsDataService(DatabaseService):
             "id",
             "sku_code",
             "sku_name",
+            "barcode",
             "price",
             "cost_price",
             "supplier",
@@ -415,26 +418,26 @@ class ProductsDataService(DatabaseService):
             logger.error("Ошибка при получении товара по SKU %s: %s", sku_code, str(e))
             raise
 
-    async def get_local_product_by_sku(
-        self, sku_code: str, user_id: int
+    async def get_local_product_by_barcode(
+        self, barcode: str, user_id: int
     ) -> Optional[Dict[str, Any]]:
         """
-        Получает товар по SKU коду.
+        Получает товар по BARCODE коду.
 
         Args:
-            sku_code: SKU код товара
+            barcode: BARCODE код товара
 
         Returns:
             Словарь с данными товара или None, если товар не найден
         """
         try:
             return await self.fetch_one(
-                "SELECT * FROM local_products WHERE user_id = $1 AND sku_code = $2",
+                "SELECT * FROM local_products WHERE user_id = $1 AND barcode = $2",
                 user_id,
-                sku_code,
+                barcode,
             )
         except Exception as e:
-            logger.error("Ошибка при получении товара по SKU %s: %s", sku_code, str(e))
+            logger.error("Ошибка при получении товара по BARCODE %s: %s", barcode, str(e))
             raise
 
     async def create_product(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
