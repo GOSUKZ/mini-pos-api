@@ -49,7 +49,7 @@ async def read_product_by_barcode(
         logger.error("Ошибка при поиске товара по штрих-коду %s: %s", barcode, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
 @router.get("/", response_model=ProductResponseDTO)

@@ -155,7 +155,7 @@ if not settings.DEBUG:
 app.include_router(auth.router)
 app.include_router(global_product.router)
 app.include_router(local_product.router)
-app.include_router(warehouse.router)
+# app.include_router(warehouse.router)
 app.include_router(audit.router)
 app.include_router(user.router)
 app.include_router(sales.router)

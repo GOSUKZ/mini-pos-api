@@ -36,8 +36,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi_cache.decorator import cache
 
-from core.dtos.product_response_dto import ProductResponseDTO
-from core.models import Product, ProductCreate, ProductUpdate, User
+from core.dtos.local_product_response_dto import LocalProductResponseDTO
+from core.models import LocalProductCreate, LocalProductDTO, ProductUpdate, User
 from utils.dependencies import can_read_products, get_services
 from utils.service_factory import ServiceFactory
 
@@ -51,7 +51,7 @@ router = APIRouter(
 )
 
 
-@router.get("/", response_model=ProductResponseDTO)
+@router.get("/", response_model=LocalProductResponseDTO)
 @cache(namespace="local-products")
 async def read_products(
     skip: int = 0,
@@ -97,7 +97,7 @@ async def read_products(
         ) from e
 
 
-@router.get("/all", response_model=List[Product])
+@router.get("/all", response_model=List[LocalProductDTO])
 # @cache(namespace="all-local-products")
 async def read_all_products(
     services: ServiceFactory = Depends(get_services),
@@ -125,9 +125,9 @@ async def read_all_products(
         ) from e
 
 
-@router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=LocalProductDTO, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product: ProductCreate,
+    product: LocalProductCreate,
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
@@ -144,15 +144,15 @@ async def create_product(
 
         return created_product
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error("Ошибка при создании товара: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
-@router.get("/{product_id}", response_model=Product)
+@router.get("/{product_id}", response_model=LocalProductDTO)
 async def read_product(
     product_id: int = Path(..., ge=1),
     services: ServiceFactory = Depends(get_services),
@@ -173,14 +173,16 @@ async def read_product(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
         return product
+    except HTTPException:
+        raise  # Пробрасываем, чтобы FastAPI сам обработал 404 и 403
     except Exception as e:
         logger.error("Ошибка при получении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
-@router.put("/{product_id}", response_model=Product)
+@router.put("/{product_id}", response_model=LocalProductDTO)
 async def update_product(
     product_id: int = Path(..., ge=1),
     product_update: ProductUpdate = ...,
@@ -212,12 +214,12 @@ async def update_product(
 
         return updated_product
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error("Ошибка при обновлении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
 @router.delete(
@@ -241,7 +243,7 @@ async def delete_product(
         logger.error("Ошибка при поиске товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error"
-        )
+        ) from e
 
     if not product:
         logger.info("Товар с ID %s не найден", product_id)
@@ -263,4 +265,4 @@ async def delete_product(
         logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e

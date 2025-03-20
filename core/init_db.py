@@ -34,25 +34,25 @@ TABLES = {
             price NUMERIC
         )
     """,
-    "warehouses": """
-        CREATE TABLE IF NOT EXISTS warehouses (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            name VARCHAR,
-            location VARCHAR,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """,
-    "warehouse_products": """
-        CREATE TABLE IF NOT EXISTS warehouse_products (
-            id SERIAL PRIMARY KEY,
-            warehouse_id INTEGER NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
-            product_id INTEGER NOT NULL REFERENCES local_products(id) ON DELETE CASCADE,
-            quantity INTEGER NOT NULL DEFAULT 0,
-            UNIQUE (warehouse_id, product_id)
-        )
-    """,
+    # "warehouses": """
+    #     CREATE TABLE IF NOT EXISTS warehouses (
+    #         id SERIAL PRIMARY KEY,
+    #         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    #         name VARCHAR,
+    #         location VARCHAR,
+    #         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    #     )
+    # """,
+    # "warehouse_products": """
+    #     CREATE TABLE IF NOT EXISTS warehouse_products (
+    #         id SERIAL PRIMARY KEY,
+    #         warehouse_id INTEGER NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+    #         product_id INTEGER NOT NULL REFERENCES local_products(id) ON DELETE CASCADE,
+    #         quantity INTEGER NOT NULL DEFAULT 0,
+    #         UNIQUE (warehouse_id, product_id)
+    #     )
+    # """,
     "users": """
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -81,6 +81,7 @@ TABLES = {
             supplier VARCHAR,
             cost_price NUMERIC,
             price NUMERIC,
+            quantity NUMERIC DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -108,7 +109,6 @@ TABLES = {
             id SERIAL PRIMARY KEY,
             sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
             product_id INTEGER NOT NULL REFERENCES local_products(id),
-            warehouse_id INTEGER NULL REFERENCES warehouses(id) ON DELETE SET NULL, -- склад теперь необязателен
             quantity INTEGER NOT NULL,
             price NUMERIC NOT NULL,
             cost_price NUMERIC NOT NULL,

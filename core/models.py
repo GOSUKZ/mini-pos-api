@@ -117,6 +117,19 @@ class LocalProduct(ProductBase):
     """Модель локального продукта"""
 
     user_id: int = Field(..., description="ID пользователя, которому принадлежит локальный продукт")
+    quantity: float
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LocalProductDTO(ProductBase):
+    """DTO для ответа без user_id"""
+
+    id: int
+
+    quantity: float
     created_at: datetime
     updated_at: datetime
 
@@ -125,6 +138,8 @@ class LocalProduct(ProductBase):
 
 class LocalProductCreate(ProductBase):
     """Модель для создания локального продукта"""
+
+    quantity: float
 
 
 class LocalProductUpdate(ProductBase):
