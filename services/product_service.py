@@ -6,9 +6,9 @@ for working with products. It implements business logic and validation.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from services.database.base import DatabaseService
+from services.database.products import ProductsDataService
 
 logger = logging.getLogger("product_service")
 
@@ -19,7 +19,7 @@ class ProductService:
     Реализует бизнес-логику и валидацию.
     """
 
-    def __init__(self, db_service: DatabaseService):
+    def __init__(self, db_service: ProductsDataService):
         """
         Инициализирует сервис с сервисом базы данных.
 
@@ -298,6 +298,23 @@ class ProductService:
             return result
         except Exception as e:
             logger.error("Ошибка при удалении товара с ID %s: %s", product_id, str(e))
+            raise
+
+    async def get_all_local_products(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Получает все локальные продукты пользователя.
+
+        Args:
+            user_id: ID пользователя
+
+        Returns:
+            Список словарей с данными локальных продуктов
+        """
+        try:
+            products = await self.db_service.get_all_local_products(user_id=user_id)
+            return products
+        except Exception as e:
+            logger.error("Ошибка при получении локальных продуктов: %s", str(e))
             raise
 
     async def get_local_products(

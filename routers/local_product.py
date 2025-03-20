@@ -31,7 +31,7 @@
 """
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi_cache.decorator import cache
@@ -89,12 +89,40 @@ async def read_products(
 
         return products
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error("Ошибка при получении списка товаров: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        ) from e
+
+
+@router.get("/all", response_model=List[Product])
+# @cache(namespace="all-local-products")
+async def read_all_products(
+    services: ServiceFactory = Depends(get_services),
+    current_user: User = Depends(can_read_products),
+):
+    """
+    Получение списка товаров с фильтрацией и сортировкой.
+    """
+    logger.info(
+        "Получение списка всех товаров пользователем %s, %s", current_user.username, current_user.id
+    )
+
+    try:
+        products = await services.get_product_service().get_all_local_products(
+            user_id=current_user.id,
         )
+
+        return products
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Ошибка при получении списка товаров: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        ) from e
 
 
 @router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED)

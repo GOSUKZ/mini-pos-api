@@ -47,33 +47,9 @@ def get_services(db=Depends(get_db)) -> ServiceFactory:
     return ServiceFactory(db)
 
 
-def get_product_service(db_service=Depends(get_services().get_product_data_service)):
-    """
-    Создает и возвращает сервис товаров.
-    Используется как зависимость.
-    """
-    return ProductService(db_service)
-
-
-def get_warehouse_service(db_service=Depends(get_services().get_warehouse_data_service)):
-    """
-    Создает и возвращает сервис складов.
-    Используется как зависимость.
-    """
-    return WarehouseService(db_service)
-
-
 def get_sync_auth_service(db_service=Depends(get_services().get_auth_data_service)):
     """
     Создает и возвращает сервис аутентификации (синхронная версия).
-    Используется как зависимость.
-    """
-    return AuthService(db_service)
-
-
-async def get_auth_service(db_service=Depends(get_services().get_auth_data_service)):
-    """
-    Создает и возвращает сервис аутентификации (асинхронная версия).
     Используется как зависимость.
     """
     return AuthService(db_service)
@@ -179,7 +155,7 @@ async def can_read_warehouses(current_user: User = Depends(get_current_active_us
 async def can_manage_product(
     product_id: int,
     current_user: User = Depends(get_current_active_user),
-    product_service: ProductService = Depends(get_product_service),
+    services: ServiceFactory = Depends(get_services),
 ) -> User:
     """
     Проверяет, может ли пользователь управлять данным продуктом.
@@ -193,7 +169,7 @@ async def can_manage_product(
     if "admin" in current_user.roles:
         return current_user
 
-    product = await product_service.get_product_by_id(product_id)
+    product = await services.get_product_service().get_product_by_id(product_id)
     if not product or product.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -206,7 +182,7 @@ async def can_manage_product(
 async def can_manage_warehouse(
     warehouse_id: int,
     current_user: User = Depends(get_current_active_user),
-    warehouse_service: WarehouseService = Depends(get_warehouse_service),
+    services: ServiceFactory = Depends(get_services),
 ) -> User:
     """
     Проверяет, может ли пользователь управлять данным складом.
@@ -220,7 +196,7 @@ async def can_manage_warehouse(
     if "admin" in current_user.roles:
         return current_user
 
-    warehouse = await warehouse_service.get_warehouse_by_id(warehouse_id)
+    warehouse = await services.get_warehouse_service().get_warehouse_by_id(warehouse_id)
     if not warehouse or warehouse.get("user_id") != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
