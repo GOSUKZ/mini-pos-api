@@ -11,9 +11,6 @@ services:
         depends_on:
             - postgres
             - redis
-        volumes:
-            - ./data:/app/data # Для хранения данных
-
     postgres:
         image: postgres:latest
         restart: always
@@ -22,12 +19,9 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
             - ./postgres-init:/docker-entrypoint-initdb.d
-
     redis:
         image: redis:alpine
         restart: always
-        ports:
-            - '6378:6379'
 
 volumes:
     postgres_data:
