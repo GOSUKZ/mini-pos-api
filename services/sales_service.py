@@ -3,6 +3,7 @@
 """
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.models import SaleItem
@@ -33,12 +34,16 @@ class SalesService:
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
         # warehouse_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         try:
             total_count = await self.db_service.get_sales_count(
                 user_id=user_id,
                 search=search,
+                start_date=start_date,
+                end_date=end_date,
                 # warehouse_id=warehouse_id
             )
 
@@ -49,6 +54,8 @@ class SalesService:
                 search=search,
                 sort_by=sort_by,
                 sort_order=sort_order,
+                start_date=start_date,
+                end_date=end_date,
                 # warehouse_id=warehouse_id,
             )
 

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.models import SaleItem
@@ -113,6 +114,8 @@ class SalesDataService(DatabaseService):
     async def get_sales_count(
         self,
         user_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
         search: Optional[str] = None,
     ) -> int:
         """
@@ -134,6 +137,16 @@ class SalesDataService(DatabaseService):
             query_parts.append(f"AND (order_id ILIKE ${param_index})")
             search_term = f"%{search}%"
             params.append(search_term)
+            param_index += 1
+
+        if start_date:
+            query_parts.append(f"AND created_at >= ${param_index}::timestamp")
+            params.append(start_date.replace(tzinfo=None))  # Убираем таймзону
+            param_index += 1
+
+        if end_date:
+            query_parts.append(f"AND created_at <= ${param_index}::timestamp")
+            params.append(end_date.replace(tzinfo=None))  # Убираем таймзону
             param_index += 1
 
         # if warehouse_id is not None:
@@ -161,6 +174,8 @@ class SalesDataService(DatabaseService):
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
         # warehouse_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -185,6 +200,16 @@ class SalesDataService(DatabaseService):
             query_parts.append(f"AND (order_id ILIKE ${param_index})")
             search_term = f"%{search}%"
             params.append(search_term)
+            param_index += 1
+
+        if start_date:
+            query_parts.append(f"AND created_at >= ${param_index}::timestamp")
+            params.append(start_date.replace(tzinfo=None))  # Убираем таймзону
+            param_index += 1
+
+        if end_date:
+            query_parts.append(f"AND created_at <= ${param_index}::timestamp")
+            params.append(end_date.replace(tzinfo=None))  # Убираем таймзону
             param_index += 1
 
         # if warehouse_id is not None:
@@ -216,7 +241,12 @@ class SalesDataService(DatabaseService):
                 return sales
 
             async with self.pool.acquire() as conn:
-                items_query = """SELECT * FROM sales_items WHERE sale_id IN (SELECT id FROM sales WHERE order_id = ANY($1))"""
+                items_query = """
+                    SELECT si.*, p.sku_name 
+                    FROM sales_items si
+                    JOIN local_products p ON si.product_id = p.id
+                    WHERE si.sale_id IN (SELECT id FROM sales WHERE order_id = ANY($1))
+                """
                 item_rows = await conn.fetch(items_query, order_ids)
                 items = [dict(row) for row in item_rows]
 

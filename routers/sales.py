@@ -3,6 +3,7 @@
 """
 
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -26,6 +27,8 @@ async def read_sales(
     skip: int = 0,
     limit: int = 100,
     search: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     sort_by: Optional[str] = None,
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     # warehouse_id: Optional[int] = None,
@@ -47,6 +50,8 @@ async def read_sales(
             search=search,
             sort_by=sort_by,
             sort_order=sort_order,
+            start_date=start_date,
+            end_date=end_date,
             # warehouse_id=warehouse_id,
         )
 
