@@ -5,12 +5,16 @@ This module provides a class for creating and managing services.
 The services are created on demand and stored in the instance.
 """
 
+from services.auth_service import AuthService
 from services.database.base import DatabaseService
 from services.database.products import ProductsDataService
 from services.database.receipt import ReceiptDataService
 from services.database.sales import SalesDataService
 from services.database.user import UsersDataService
 from services.database.warehouse import WarehousesDataService
+from services.product_service import ProductService
+from services.sales_service import SalesService
+from services.warehouse_service import WarehouseService
 
 
 class ServiceFactory:
@@ -34,6 +38,11 @@ class ServiceFactory:
         self._product_data_service = None
         self._sales_data_service = None
         self._receipt_data_service = None
+
+        self._auth_service = None
+        self._sales_service = None
+        self._warehouse_service = None
+        self._product_service = None
 
     def get_db_service(self):
         """
@@ -124,3 +133,63 @@ class ServiceFactory:
         if not self._receipt_data_service:
             self._receipt_data_service = ReceiptDataService(self.db)
         return self._receipt_data_service
+
+    def get_auth_service(self):
+        """
+        Returns an instance of AuthService.
+
+        This method ensures that a single instance of AuthService is created
+        and reused. If the instance does not already exist, it is created using
+        the provided database connection.
+
+        Returns:
+            AuthService: The instance of the auth service.
+        """
+        if not self._auth_service:
+            self._auth_service = AuthService(self.get_auth_data_service())
+        return self._auth_service
+
+    def get_sales_service(self):
+        """
+        Returns an instance of SalesService.
+
+        This method ensures that a single instance of SalesService is created
+        and reused. If the instance does not already exist, it is created using
+        the provided database connection.
+
+        Returns:
+            SalesService: The instance of the sales service.
+        """
+        if not self._sales_service:
+            self._sales_service = SalesService(self.get_sales_data_service())
+        return self._sales_service
+
+    def get_warehouse_service(self):
+        """
+        Returns the warehouse service instance.
+
+        This method ensures that a single instance of WarehouseService is created
+        and reused. If the instance does not already exist, it is created using
+        the provided database connection.
+
+        Returns:
+            WarehouseService: The instance of the warehouse service.
+        """
+        if not self._warehouse_service:
+            self._warehouse_service = WarehouseService(self.get_warehouse_data_service())
+        return self._warehouse_service
+
+    def get_product_service(self):
+        """
+        Returns the product service instance.
+
+        This method ensures that a single instance of ProductService is created
+        and reused. If the instance does not already exist, it is created using
+        the provided database connection.
+
+        Returns:
+            ProductService: The instance of the product service.
+        """
+        if not self._product_service:
+            self._product_service = ProductService(self.get_product_data_service())
+        return self._product_service

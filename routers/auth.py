@@ -46,7 +46,7 @@ async def register_user(
     logger.info("Регистрация нового пользователя: %s", user_data.username)
 
     try:
-        user = await services.auth_service.register_user(
+        user = await services._auth_service.register_user(
             username=user_data.username,
             password=user_data.password,
             email=user_data.email,
@@ -75,7 +75,7 @@ async def login_for_access_token(
     logger.info("Запрос токена для пользователя: %s", form_data.username)
 
     try:
-        user = await services.auth_service.authenticate_user(
+        user = await services.get_auth_service().authenticate_user(
             username=form_data.username, password=form_data.password
         )
 
@@ -90,7 +90,7 @@ async def login_for_access_token(
             )
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = services.auth_service.create_access_token(
+        access_token = services.get_auth_service().create_access_token(
             data={"sub": user.get("username"), "roles": user.get("roles", [])},
             expires_delta=access_token_expires,
         )
@@ -110,7 +110,7 @@ async def google_login(
     services: ServiceFactory = Depends(get_services),
 ):
     """Генерирует URL для авторизации через Google и перенаправляет на него."""
-    auth_url = await services.auth_service.get_google_auth_url()
+    auth_url = await services.get_auth_service().get_google_auth_url()
     return RedirectResponse(url=auth_url)
 
 
@@ -123,7 +123,7 @@ async def google_callback(
         raise HTTPException(status_code=400, detail="No authorization code provided")
 
     # Аутентификация через Google
-    auth_result = await services.auth_service.authenticate_with_google(code)
+    auth_result = await services.get_auth_service().authenticate_with_google(code)
 
     # Установка cookies с токенами (опционально)
     if response:
