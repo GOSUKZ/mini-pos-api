@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from core.models import SaleItem
-from services.database.base import DatabaseService
+from services.database.sales import SalesDataService
 
 logger = logging.getLogger("sales_service")
 
@@ -16,7 +16,7 @@ class SalesService:
     Сервис продаж
     """
 
-    def __init__(self, db_service: DatabaseService):
+    def __init__(self, db_service: SalesDataService):
         """
         Инициализирует сервис с сервисом базы данных.
 
@@ -33,11 +33,13 @@ class SalesService:
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
-        warehouse_id: Optional[int] = None,
+        # warehouse_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         try:
             total_count = await self.db_service.get_sales_count(
-                user_id=user_id, search=search, warehouse_id=warehouse_id
+                user_id=user_id,
+                search=search,
+                # warehouse_id=warehouse_id
             )
 
             sales = await self.db_service.get_sales(
@@ -47,7 +49,7 @@ class SalesService:
                 search=search,
                 sort_by=sort_by,
                 sort_order=sort_order,
-                warehouse_id=warehouse_id,
+                # warehouse_id=warehouse_id,
             )
 
             current_page = (skip // limit) + 1 if limit > 0 else 1
@@ -106,7 +108,7 @@ class SalesService:
         if not sale_details or sale_details["status"] in ["paid", "cancelled"]:
             return False  # Нельзя отменить уже оплаченное или отменённое
 
-        success = await self.db_service.update_sale_status(order_id, "cancelled")
+        success = await self.db_service.cancel_sale(order_id)
 
         return success
 

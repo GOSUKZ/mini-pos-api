@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_cache.decorator import cache
 
 from core.dtos.sale_response_dto import SaleResponseDTO
-from core.models import Currency, PaymentMethod, SaleItem, User
+from core.dtos.sales import CreateSaleResponseDTO
+from core.models import Currency, PaymentMethod, Sale, SaleItem, User
 from utils.dependencies import can_read_sales, get_current_active_user, get_services
 from utils.service_factory import ServiceFactory
 
@@ -27,7 +28,7 @@ async def read_sales(
     search: Optional[str] = None,
     sort_by: Optional[str] = None,
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
-    warehouse_id: Optional[int] = None,
+    # warehouse_id: Optional[int] = None,
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_sales),
 ):
@@ -39,27 +40,27 @@ async def read_sales(
     )
 
     try:
-        sales = await services.get_sales(
+        sales = await services.get_sales_service().get_sales(
             user_id=current_user.id,
             skip=skip,
             limit=limit,
             search=search,
             sort_by=sort_by,
             sort_order=sort_order,
-            warehouse_id=warehouse_id,
+            # warehouse_id=warehouse_id,
         )
 
         return sales
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error("Ошибка при получении списка товаров: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
-@router.post("/create")
+@router.post("/create", status_code=status.HTTP_201_CREATED, response_model=CreateSaleResponseDTO)
 async def create_payment(
     items: List[SaleItem],
     currency: Currency = Currency.KZT,
@@ -69,16 +70,16 @@ async def create_payment(
 ):
     """Создание продажи и чека"""
     try:
-        order_id = await services.create_sale(
+        order_id = await services.get_sales_service().create_sale(
             user_id=current_user.id, items=items, currency=currency, payment_method=payment_method
         )
 
-        return {"order_id": order_id, "message": "Продажа успешно создана"}
+        return {"order_id": order_id}
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
 @router.post("/confirm")
@@ -86,7 +87,7 @@ async def confirm_payment(order_id: str, services: ServiceFactory = Depends(get_
     """
     Подтверждает оплату и создаёт чек.
     """
-    success = await services.confirm_payment(order_id)
+    success = await services.get_sales_service().confirm_payment(order_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось подтвердить оплату"
@@ -95,26 +96,28 @@ async def confirm_payment(order_id: str, services: ServiceFactory = Depends(get_
     return {"order_id": order_id, "message": "Оплата подтверждена"}
 
 
-@router.post("/cancel")
+@router.delete(
+    "/cancel", status_code=status.HTTP_202_ACCEPTED, response_model=CreateSaleResponseDTO
+)
 async def cancel_sale(order_id: str, services: ServiceFactory = Depends(get_services)):
     """
     Отменяет продажу.
     """
-    success = await services.cancel_sale(order_id)
+    success = await services.get_sales_service().cancel_sale(order_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось отменить продажу"
         )
 
-    return {"order_id": order_id, "message": "Продажа отменена"}
+    return {"order_id": order_id}
 
 
-@router.get("/{order_id}")
+@router.get("/{order_id}", response_model=Sale)
 async def get_sale_info(order_id: str, services: ServiceFactory = Depends(get_services)):
     """
     Получает информацию о продаже.
     """
-    sale_info = await services.get_sale_info(order_id)
+    sale_info = await services.get_sales_service().get_sale_info(order_id)
     if not sale_info:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Продажа не найдена")
 

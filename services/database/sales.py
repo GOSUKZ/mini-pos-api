@@ -39,10 +39,9 @@ class SalesDataService(DatabaseService):
 
                     for item in items:
                         await conn.execute(
-                            """INSERT INTO sales_items (sale_id, product_id, warehouse_id, quantity, price, cost_price, total) VALUES ((SELECT id FROM sales WHERE order_id = $1), $2, $3, $4, $5, $6, $7)""",
+                            """INSERT INTO sales_items (sale_id, product_id, quantity, price, cost_price, total) VALUES ((SELECT id FROM sales WHERE order_id = $1), $2, $3, $4, $5, $6)""",
                             order_id,
                             item.product_id,
-                            item.warehouse_id,
                             item.quantity,
                             item.price,
                             item.cost_price,
@@ -74,6 +73,16 @@ class SalesDataService(DatabaseService):
             logger.error("Ошибка при обновлении статуса продажи %s: %s", order_id, str(e))
             return False
 
+    async def cancel_sale(self, order_id: str) -> bool:
+        """Отменяет продажу"""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.execute("DELETE FROM sales WHERE order_id = $1", order_id)
+            return result == "DELETE 1"
+        except Exception as e:
+            logger.error("Ошибка при отмене продажи %s: %s", order_id, str(e))
+            return False
+
     async def get_sale_details(self, order_id: str) -> Optional[Dict[str, Any]]:
         """Получает детали заказа и товаров в нём."""
         async with self.pool.acquire() as conn:
@@ -98,7 +107,6 @@ class SalesDataService(DatabaseService):
         self,
         user_id: int,
         search: Optional[str] = None,
-        warehouse_id: Optional[int] = None,
     ) -> int:
         """
         Получает общее количество продаж пользователя с учетом фильтрации.
@@ -106,7 +114,6 @@ class SalesDataService(DatabaseService):
         Args:
             user_id: ID пользователя
             search: Строка поиска, используется для фильтрации по идентификатору заказа
-            warehouse_id: Фильтр по ID склада
 
         Returns:
             Общее количество продаж
@@ -122,12 +129,12 @@ class SalesDataService(DatabaseService):
             params.append(search_term)
             param_index += 1
 
-        if warehouse_id is not None:
-            query_parts.append(
-                f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
-            )
-            params.append(warehouse_id)
-            param_index += 1
+        # if warehouse_id is not None:
+        #     query_parts.append(
+        #         f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
+        #     )
+        #     params.append(warehouse_id)
+        #     param_index += 1
 
         query = " ".join(query_parts)
 
@@ -147,7 +154,7 @@ class SalesDataService(DatabaseService):
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
-        warehouse_id: Optional[int] = None,
+        # warehouse_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает список продаж пользователя с учетом параметров фильтрации и сортировки.
@@ -159,7 +166,6 @@ class SalesDataService(DatabaseService):
             search: Строка поиска
             sort_by: Поле для сортировки
             sort_order: Порядок сортировки (asc или desc)
-            warehouse_id: Фильтр по ID склада
 
         Returns:
             Список словарей с данными продаж
@@ -174,12 +180,12 @@ class SalesDataService(DatabaseService):
             params.append(search_term)
             param_index += 1
 
-        if warehouse_id is not None:
-            query_parts.append(
-                f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
-            )
-            params.append(warehouse_id)
-            param_index += 1
+        # if warehouse_id is not None:
+        #     query_parts.append(
+        #         f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
+        #     )
+        #     params.append(warehouse_id)
+        #     param_index += 1
 
         valid_columns = ["id", "order_id", "total_amount", "currency", "status", "created_at"]
 

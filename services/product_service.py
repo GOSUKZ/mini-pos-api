@@ -323,7 +323,7 @@ class ProductService:
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        warehouse_id: Optional[int] = None,
+        # warehouse_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Получает список локальных продуктов пользователя с фильтрацией и сортировкой.
@@ -346,7 +346,7 @@ class ProductService:
                 department=department,
                 min_price=min_price,
                 max_price=max_price,
-                warehouse_id=warehouse_id,
+                # warehouse_id=warehouse_id,
             )
 
             products = await self.db_service.get_local_products(
@@ -359,7 +359,7 @@ class ProductService:
                 department=department,
                 min_price=min_price,
                 max_price=max_price,
-                warehouse_id=warehouse_id,
+                # warehouse_id=warehouse_id,
             )
 
             current_page = (skip // limit) + 1 if limit > 0 else 1

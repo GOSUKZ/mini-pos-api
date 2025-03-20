@@ -62,7 +62,7 @@ async def read_products(
     department: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
-    warehouse_id: Optional[int] = None,
+    # warehouse_id: Optional[int] = None,
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
@@ -84,7 +84,7 @@ async def read_products(
             department=department,
             min_price=min_price,
             max_price=max_price,
-            warehouse_id=warehouse_id,
+            # warehouse_id=warehouse_id,
         )
 
         return products

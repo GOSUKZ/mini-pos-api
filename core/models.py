@@ -567,7 +567,7 @@ class OrderItem(BaseModel):
     id: int
     sale_id: int
     product_id: int
-    warehouse_id: Optional[str] = None
+    # warehouse_id: Optional[str] = None
     quantity: int
     price: float
     cost_price: float
@@ -590,4 +590,4 @@ class SaleItem(BaseModel):
     quantity: int
     price: float
     cost_price: float
-    warehouse_id: Optional[str] = None
+    # warehouse_id: Optional[str] = None

@@ -9,11 +9,14 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 import redis.asyncio as redis
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -51,9 +54,19 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     LOG_FILE: str = "api.log"
 
-    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+    POSTGRES_HOST: Optional[str] = os.getenv("POSTGRES_HOST")
+    POSTGRES_PORT: Optional[str] = os.getenv("POSTGRES_PORT")
+    POSTGRES_USER: Optional[str] = os.getenv("POSTGRES_USER")
+    POSTGRES_PASSWORD: Optional[str] = os.getenv("POSTGRES_PASSWORD")
+    POSTGRES_DB: Optional[str] = os.getenv("POSTGRES_DB")
 
-    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensetive=True)
+    DATABASE_URL: Optional[str] = (
+        f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    )
+
+    model_config = ConfigDict(
+        env_file=".env", env_file_encoding="utf-8", case_sensetive=True, extra="allow"
+    )
 
 
 @lru_cache()

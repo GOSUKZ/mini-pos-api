@@ -151,7 +151,7 @@ class ProductsDataService(DatabaseService):
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        warehouse_id: Optional[int] = None,
+        # warehouse_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Получает список локальных товаров пользователя с фильтрами и сортировкой.
@@ -197,12 +197,12 @@ class ProductsDataService(DatabaseService):
             params.append(max_price)
             param_index += 1
 
-        if warehouse_id is not None:
-            query_parts.append(
-                f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
-            )
-            params.append(warehouse_id)
-            param_index += 1
+        # if warehouse_id is not None:
+        #     query_parts.append(
+        #         f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
+        #     )
+        #     params.append(warehouse_id)
+        #     param_index += 1
 
         valid_columns = [
             "id",
@@ -295,7 +295,7 @@ class ProductsDataService(DatabaseService):
         department: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        warehouse_id: Optional[int] = None,
+        # warehouse_id: Optional[int] = None,
     ) -> int:
         """
         Получает общее количество товаров пользователя с учетом фильтрации.
@@ -337,12 +337,12 @@ class ProductsDataService(DatabaseService):
             params.append(max_price)
             param_index += 1
 
-        if warehouse_id is not None:
-            query_parts.append(
-                f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
-            )
-            params.append(warehouse_id)
-            param_index += 1
+        # if warehouse_id is not None:
+        #     query_parts.append(
+        #         f"""AND id IN (SELECT product_id FROM warehouse_products WHERE warehouse_id = ${param_index})"""
+        #     )
+        #     params.append(warehouse_id)
+        #     param_index += 1
 
         query = " ".join(query_parts)
 

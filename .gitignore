@@ -30,4 +30,5 @@ archive.zip
 .DS_Store
 
 .env
+.env.prod
 api.log
