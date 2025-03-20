@@ -6,7 +6,6 @@ This module provides a service for authentication operations.
 
 import logging
 import os
-from datetime import datetime, timedelta
 from http.client import HTTPException
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -25,12 +24,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
-GOOGLE_REDIRECT_URI = settings.GOOGLE_REDIRECT_URI
-GOOGLE_AUTH_URL = settings.GOOGLE_AUTH_URL
-GOOGLE_TOKEN_URL = settings.GOOGLE_TOKEN_URL
-GOOGLE_USER_INFO_URL = settings.GOOGLE_USER_INFO_URL
 # Настройка хеширования паролей
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -114,9 +107,7 @@ class AuthService:
             logger.error("Ошибка при аутентификации пользователя %s: %s", username, str(e))
             raise
 
-    def create_access_token(
-        self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None
-    ) -> str:
+    def create_access_token(self, data: Dict[str, Any]) -> str:
         """
         Создает JWT токен доступа.
 
@@ -128,13 +119,6 @@ class AuthService:
             JWT токен
         """
         to_encode = data.copy()
-
-        if expires_delta:
-            expire = datetime.utcnow() + expires_delta
-        else:
-            expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-        to_encode.update({"exp": expire})
 
         try:
             encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -270,85 +254,3 @@ class AuthService:
         except Exception as e:
             logger.error("Ошибка при регистрации пользователя %s: %s", username, str(e))
             raise
-
-    async def get_google_auth_url(self) -> str:
-        """Генерирует URL для авторизации через Google."""
-        params = {
-            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-            "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
-            "response_type": "code",
-            "scope": "email profile",
-            "access_type": "offline",
-            "prompt": "consent",
-        }
-        return f"{os.getenv("GOOGLE_AUTH_URL")}?{urlencode(params)}"
-
-    async def exchange_code_for_token(self, code: str) -> Dict:
-        """Обменивает код авторизации на токен доступа."""
-        data = {
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "code": code,
-            "grant_type": "authorization_code",
-            "redirect_uri": GOOGLE_REDIRECT_URI,
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(GOOGLE_TOKEN_URL, data=data)
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to get token from Google")
-
-        return response.json()
-
-    async def get_user_info(self, token: str) -> Dict:
-        """Получает информацию о пользователе из Google API."""
-        headers = {"Authorization": f"Bearer {token}"}
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(GOOGLE_USER_INFO_URL, headers=headers)
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
-
-        return response.json()
-
-    async def authenticate_with_google(self, code: str) -> Dict:
-        """Полный процесс аутентификации через Google."""
-        # Получение токена
-        token_data = await self.exchange_code_for_token(code)
-        access_token = token_data.get("access_token")
-
-        if not access_token:
-            raise HTTPException(status_code=400, detail="No access token received")
-
-        # Получение информации о пользователе
-        user_info = await self.get_user_info(access_token)
-
-        # Проверка наличия email
-        email = user_info.get("email")
-        if not email:
-            raise HTTPException(status_code=400, detail="Email not provided by Google")
-
-        # Найти пользователя в базе данных или создать нового
-        user = await self.db_service.get_user_by_email(email)
-
-        if not user:
-            # Создаем нового пользователя
-            new_user_data = {
-                "email": email,
-                "name": user_info.get("name", ""),
-                "picture": user_info.get("picture", ""),
-                "is_verified": user_info.get("email_verified", False),
-                "auth_provider": "google",
-            }
-            user = await self.db_service.create_user(new_user_data)
-
-        # Генерация JWT токена
-        tokens = self.db_service.create_tokens({"user_id": str(user["id"]), "email": user["email"]})
-
-        return {
-            "user": user,
-            "access_token": tokens["access_token"],
-            "refresh_token": tokens["refresh_token"],
-        }

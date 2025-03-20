@@ -6,17 +6,14 @@ The endpoints are:
 - `/auth/login`: Logs in an existing user.
 - `/auth/logout`: Logs out the current user.
 - `/auth/token`: Generates a new token for the current user.
-- `/auth/refresh`: Refreshes the token for the current user.
-- `/auth/google`: Logs in with Google.
 
 The module uses the `get_auth_service` dependency to create an instance of the
 `AuthService` class, which provides the actual authentication logic.
 """
 
 import logging
-from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 
 from config import get_settings
@@ -30,7 +27,7 @@ settings = get_settings()
 # Создаем роутер
 router = APIRouter(
     prefix="/auth",
-    tags=["auth"],
+    tags=["Auth"],
     responses={401: {"description": "Unauthorized"}},
 )
 
@@ -46,7 +43,7 @@ async def register_user(
     logger.info("Регистрация нового пользователя: %s", user_data.username)
 
     try:
-        user = await services._auth_service.register_user(
+        user = await services.get_auth_service().register_user(
             username=user_data.username,
             password=user_data.password,
             email=user_data.email,
@@ -56,12 +53,12 @@ async def register_user(
         return {"message": "User registered successfully", "username": user.get("username")}
     except ValueError as e:
         logger.warning("Ошибка при регистрации пользователя: %s", str(e))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error("Ошибка при регистрации пользователя: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-        )
+        ) from e
 
 
 @router.post("/token", response_model=Token)
@@ -89,10 +86,8 @@ async def login_for_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = services.get_auth_service().create_access_token(
             data={"sub": user.get("username"), "roles": user.get("roles", [])},
-            expires_delta=access_token_expires,
         )
 
         return {"access_token": access_token, "token_type": "bearer"}
@@ -103,50 +98,3 @@ async def login_for_access_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         )
-
-
-@router.get("/google/login")
-async def google_login(
-    services: ServiceFactory = Depends(get_services),
-):
-    """Генерирует URL для авторизации через Google и перенаправляет на него."""
-    auth_url = await services.get_auth_service().get_google_auth_url()
-    return RedirectResponse(url=auth_url)
-
-
-@router.get("/google/callback")
-async def google_callback(
-    code: str, services: ServiceFactory = Depends(get_services), response: Response = None
-):
-    """Обрабатывает callback от Google OAuth."""
-    if not code:
-        raise HTTPException(status_code=400, detail="No authorization code provided")
-
-    # Аутентификация через Google
-    auth_result = await services.get_auth_service().authenticate_with_google(code)
-
-    # Установка cookies с токенами (опционально)
-    if response:
-        response.set_cookie(
-            key="access_token",
-            value=auth_result["access_token"],
-            httponly=True,
-            max_age=1800,  # 30 минут
-            secure=True,
-            samesite="lax",
-        )
-        response.set_cookie(
-            key="refresh_token",
-            value=auth_result["refresh_token"],
-            httponly=True,
-            max_age=604800,  # 7 дней
-            secure=True,
-            samesite="lax",
-        )
-
-    # Возвращаем токены и информацию о пользователе
-    return {
-        "access_token": auth_result["access_token"],
-        "refresh_token": auth_result["refresh_token"],
-        "user": auth_result["user"],
-    }

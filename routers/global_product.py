@@ -35,7 +35,7 @@ async def read_product_by_barcode(
     logger.info("Поиск товара по штрих-коду %s пользователем %s", barcode, current_user.username)
 
     try:
-        product = await services.get_product_by_barcode(
+        product = await services.get_product_service().get_product_by_barcode(
             barcode=barcode, current_user=current_user.model_dump()
         )
 
@@ -72,7 +72,7 @@ async def read_products(
     logger.info("Получение списка товаров пользователем %s", current_user.username)
 
     try:
-        products = await services.get_products(
+        products = await services.get_product_service().get_products(
             skip=skip,
             limit=limit,
             search=search,
@@ -107,7 +107,7 @@ async def create_product(
     logger.info("Creating product by user %s", current_user.username)
 
     try:
-        created_product = await services.create_product(
+        created_product = await services.get_product_service().create_product(
             product_data=product.model_dump(), current_user=current_user.model_dump()
         )
 
@@ -133,7 +133,7 @@ async def read_product(
     logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await services.get_product(
+        product = await services.get_product_service().get_product(
             product_id=product_id, current_user=current_user.model_dump()
         )
 
@@ -162,7 +162,7 @@ async def update_product(
     logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        updated_product = await services.update_product(
+        updated_product = await services.get_product_service().update_product(
             product_id=product_id,
             product_data=product_update.model_dump(exclude_unset=True),
             current_user=current_user.model_dump(),
@@ -194,7 +194,7 @@ async def delete_product(
     logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        result = await services.delete_product(
+        result = await services.get_product_service().delete_product(
             product_id=product_id, current_user=current_user.model_dump()
         )
 

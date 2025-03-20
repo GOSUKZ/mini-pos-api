@@ -85,18 +85,6 @@ TABLES = {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """,
-    "oauth_accounts": """
-        CREATE TABLE IF NOT EXISTS oauth_accounts (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-            provider VARCHAR,
-            provider_user_id VARCHAR,
-            access_token VARCHAR,
-            refresh_token VARCHAR,
-            expires_at TIMESTAMP,
-            UNIQUE (provider, provider_user_id)
-        )
-    """,
     "sales": """
         CREATE TABLE IF NOT EXISTS sales (
             id SERIAL PRIMARY KEY,

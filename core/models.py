@@ -10,7 +10,6 @@
 - Модели пользователей (UserBase, UserCreate, UserUpdate и т.д.)
 - Модели токенов (Token, TokenData)
 - Модели аудита (AuditLog, AuditLogFilter)
-- Модели OAuth аккаунтов (OAuthAccountBase)
 """
 
 import re
@@ -474,39 +473,6 @@ class AuditLogFilter(BaseModel):
     limit: int = 100
 
 
-class OAuthAccountBase(BaseModel):
-    """Базовая модель OAuth аккаунта"""
-
-    provider: str
-    provider_user_id: int
-    access_token: str
-    refresh_token: Optional[str] = None
-    expires_at: Optional[datetime] = None
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_default=True,
-    )
-
-
-class OAuthAccountCreate(OAuthAccountBase):
-    """Модель создания OAuth аккаунта"""
-
-    user_id: int
-
-
-class OAuthAccount(OAuthAccountBase):
-    """Полная модель OAuth аккаунта с ID"""
-
-    id: int
-    user_id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# --- Модели платежей ---
-
-
 class PaymentBase(BaseModel):
     """Базовая модель платежа"""
 
@@ -612,19 +578,6 @@ class PaymentResponse(BaseModel):
 
     order_id: str
     approve_url: str
-
-
-# --- Модификация существующих моделей пользователя ---
-
-
-class GoogleUserInfo(BaseModel):
-    """Модель данных пользователя от Google OAuth"""
-
-    email: str
-    email_verified: bool = False
-    name: Optional[str] = None
-    picture: Optional[str] = None
-    sub: str  # ID пользователя в Google
 
 
 class Warehouse(BaseModel):

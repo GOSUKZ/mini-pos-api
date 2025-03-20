@@ -43,14 +43,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_REQUESTS: int = 100
     RATE_LIMIT_TIME_WINDOW: int = 60  # в секундах
 
-    # google
-    GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
-    GOOGLE_REDIRECT_URI: Optional[str] = os.getenv("GOOGLE_REDIRECT_URI")
-    GOOGLE_AUTH_URL: Optional[str] = os.getenv("GOOGLE_AUTH_URL")
-    GOOGLE_TOKEN_URL: Optional[str] = os.getenv("GOOGLE_TOKEN_URL")
-    GOOGLE_USER_INFO_URL: Optional[str] = os.getenv("GOOGLE_USER_INFO_URL")
-
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: str = os.getenv("REDIS_PORT", "6379")
 

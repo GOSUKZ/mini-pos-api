@@ -74,7 +74,7 @@ async def read_products(
     )
 
     try:
-        products = await services.get_local_products(
+        products = await services.get_product_service().get_local_products(
             user_id=current_user.id,
             skip=skip,
             limit=limit,
@@ -110,7 +110,7 @@ async def create_product(
     logger.info("Создание товара пользователем %s", current_user.username)
 
     try:
-        created_product = await services.create_local_product(
+        created_product = await services.get_product_service().create_local_product(
             product_data=product.model_dump(), user_id=current_user.id
         )
 
@@ -136,7 +136,7 @@ async def read_product(
     logger.info("Получение товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await services.get_local_product(product_id=product_id)
+        product = await services.get_product_service().get_local_product(product_id=product_id)
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -165,7 +165,7 @@ async def update_product(
     logger.info("Обновление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await services.get_local_product(product_id=product_id)
+        product = await services.get_product_service().get_local_product(product_id=product_id)
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -173,7 +173,7 @@ async def update_product(
         if product.get("user_id") != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-        updated_product = await services.update_local_product(
+        updated_product = await services.get_product_service().update_local_product(
             product_id=product_id,
             product_data=product_update.model_dump(exclude_unset=True),
             current_user=current_user.model_dump(),
@@ -208,7 +208,7 @@ async def delete_product(
     logger.info("Удаление товара с ID %s пользователем %s", product_id, current_user.username)
 
     try:
-        product = await services.get_local_product(product_id=product_id)
+        product = await services.get_product_service().get_local_product(product_id=product_id)
     except Exception as e:
         logger.error("Ошибка при поиске товара с ID %s: %s", product_id, str(e))
         raise HTTPException(
@@ -224,7 +224,7 @@ async def delete_product(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     try:
-        result = await services.delete_local_product(product_id=product_id)
+        result = await services.get_product_service().delete_local_product(product_id=product_id)
 
         if not result:
             logger.info("Не удалось удалить товар с ID %s, возможно, он уже удален", product_id)

@@ -81,7 +81,7 @@ async def get_auth_service(db_service=Depends(get_services().get_auth_data_servi
 
 async def get_current_user(
     token: str = Security(api_key_header),
-    auth_service: AuthService = Depends(get_sync_auth_service),
+    services: ServiceFactory = Depends(get_services),
 ) -> User:
     """
     Получает текущего пользователя по токену.
@@ -90,7 +90,7 @@ async def get_current_user(
     Raises:
         HTTPException: Если токен недействителен или истек
     """
-    user = await auth_service.get_current_user(token)
+    user = await services.get_auth_service().get_current_user(token)
 
     if not user:
         logger.warning("Недействительные учетные данные: %s...", token[:10])
