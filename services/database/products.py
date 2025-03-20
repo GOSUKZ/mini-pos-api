@@ -354,7 +354,7 @@ class ProductsDataService(DatabaseService):
             logger.error("Ошибка при получении количества товаров: %s", e)
             raise
 
-    async def get_product_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
+    async def get_product_by_barcode(self, barcode: str, user_id: int) -> Optional[Dict[str, Any]]:
         """
         Получение товара по штрих-коду.
 
@@ -365,7 +365,19 @@ class ProductsDataService(DatabaseService):
             Информация о товаре или None, если товар не найден
         """
         try:
-            return await self.fetch_one("SELECT * FROM products WHERE barcode = $1", barcode)
+            local_product = await self.fetch_one(
+                "SELECT * FROM local_products WHERE barcode = $1 AND user_id = $2", barcode, user_id
+            )
+
+            if local_product:
+                return local_product
+
+            product = await self.fetch_one("SELECT * FROM products WHERE barcode = $1", barcode)
+
+            if not product:
+                return None
+
+            return product
         except Exception as e:
             logger.error("Ошибка при получении товара по штрих-коду из БД: %s", str(e))
             raise

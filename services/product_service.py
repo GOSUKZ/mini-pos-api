@@ -42,7 +42,9 @@ class ProductService:
             Информация о товаре или None, если товар не найден
         """
         try:
-            product = await self.db_service.get_product_by_barcode(barcode)
+            product = await self.db_service.get_product_by_barcode(
+                barcode, user_id=current_user.get("id")
+            )
 
             if not product:
                 return None
