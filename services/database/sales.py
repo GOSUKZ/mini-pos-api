@@ -84,14 +84,20 @@ class SalesDataService(DatabaseService):
             return False
 
     async def get_sale_details(self, order_id: str) -> Optional[Dict[str, Any]]:
-        """Получает детали заказа и товаров в нём."""
+        """Получает детали заказа и товаров в нём, включая sku_name."""
         async with self.pool.acquire() as conn:
             sale = await conn.fetchrow("SELECT * FROM sales WHERE order_id = $1", order_id)
 
             if not sale:
                 return None
 
-            items = await conn.fetch("SELECT * FROM sales_items WHERE sale_id = $1", sale["id"])
+            query = """
+                SELECT si.*, p.sku_name
+                FROM sales_items si
+                LEFT JOIN local_products p ON si.product_id = p.id
+                WHERE si.sale_id = $1
+            """
+            items = await conn.fetch(query, sale["id"])
 
             return {
                 "order_id": sale["order_id"],
@@ -100,7 +106,8 @@ class SalesDataService(DatabaseService):
                 "currency": sale["currency"],
                 "status": sale["status"],
                 "created_at": sale["created_at"],
-                "items": [dict(item) for item in items],
+                "updated_at": sale["updated_at"],
+                "items": [dict(item) for item in items],  # Теперь в каждом товаре есть sku_name
             }
 
     async def get_sales_count(

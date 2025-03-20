@@ -567,6 +567,7 @@ class OrderItem(BaseModel):
     id: int
     sale_id: int
     product_id: int
+    sku_name: str
     # warehouse_id: Optional[str] = None
     quantity: int
     price: float
