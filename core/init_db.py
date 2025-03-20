@@ -18,22 +18,6 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 TABLES = {
-    "products": """
-        CREATE TABLE IF NOT EXISTS products (
-            id SERIAL PRIMARY KEY,
-            sku_code VARCHAR,
-            barcode VARCHAR UNIQUE,
-            unit VARCHAR,
-            sku_name VARCHAR,
-            status_1c VARCHAR,
-            department VARCHAR,
-            group_name VARCHAR,
-            subgroup VARCHAR,
-            supplier VARCHAR,
-            cost_price NUMERIC,
-            price NUMERIC
-        )
-    """,
     # "warehouses": """
     #     CREATE TABLE IF NOT EXISTS warehouses (
     #         id SERIAL PRIMARY KEY,
