@@ -31,7 +31,7 @@ async def get_metrics():
         else:
             endpoint = key.split(":")[1]
         metrics[endpoint] = int(await redis_client.get(key))
-    return metrics
+    return dict(sorted(metrics.items(), key=lambda x: x[1], reverse=True))
 
 
 @router.get("/metrics")

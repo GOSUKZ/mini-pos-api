@@ -125,20 +125,14 @@ class LocalProductCreate(ProductBase):
     quantity: float
 
 
-class LocalProductUpdate(ProductBase):
+class LocalProductUpdate(BaseModel):
     """Модель для обновления локального продукта с опциональными полями"""
 
-    sku_code: Optional[str] = None
-    barcode: Optional[str] = None
     unit: Optional[str] = None
     sku_name: Optional[str] = None
-    status_1c: Optional[str] = None
-    department: Optional[str] = None
-    group_name: Optional[str] = None
-    subgroup: Optional[str] = None
-    supplier: Optional[str] = None
     cost_price: Optional[float] = None
     price: Optional[float] = None
+    quantity: Optional[float] = None
 
 
 class ProductCreate(ProductBase):

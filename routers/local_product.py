@@ -37,7 +37,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi_cache.decorator import cache
 
 from core.dtos.local_product_response_dto import LocalProductResponseDTO
-from core.models import LocalProductCreate, LocalProductDTO, ProductUpdate, User
+from core.models import LocalProductCreate, LocalProductDTO, LocalProductUpdate, User
 from utils.dependencies import can_read_products, get_services
 from utils.service_factory import ServiceFactory
 
@@ -189,7 +189,7 @@ async def read_product(
 @router.put("/{product_id}", response_model=LocalProductDTO)
 async def update_product(
     product_id: int = Path(..., ge=1),
-    product_update: ProductUpdate = ...,
+    product_update: LocalProductUpdate = ...,
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(can_read_products),
 ):
