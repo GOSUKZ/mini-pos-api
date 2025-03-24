@@ -23,3 +23,10 @@ COPY temp_products FROM '/docker-entrypoint-initdb.d/data.csv' WITH CSV HEADER;
 INSERT INTO products
 SELECT * FROM temp_products
 ON CONFLICT (barcode) DO NOTHING;
+
+CREATE INDEX idx_sales_user_id ON sales (user_id);
+CREATE INDEX idx_sales_status ON sales (status);
+CREATE INDEX idx_sales_created_at ON sales (created_at);
+CREATE INDEX idx_sales_order_id ON sales (order_id);
+
+CREATE INDEX idx_sales_items_product_id ON sales_items (product_id);

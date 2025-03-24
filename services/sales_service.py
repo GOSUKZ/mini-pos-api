@@ -140,3 +140,15 @@ class SalesService:
         Получает детали заказа.
         """
         return await self.db_service.get_sale_details(order_id)
+
+    async def get_sales_analytics(
+        self,
+        user_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ):
+        try:
+            return await self.db_service.get_sales_analytics(user_id, start_date, end_date)
+        except Exception as e:
+            logger.error("Ошибка при получении аналитики: %s", str(e))
+            raise

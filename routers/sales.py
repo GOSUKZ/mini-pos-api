@@ -12,10 +12,14 @@ from fastapi_cache.decorator import cache
 from core.dtos.sale_response_dto import SaleResponseDTO
 from core.dtos.sales import CreateSaleResponseDTO, SaleMessageResponseDTO
 from core.models import Currency, OrderStatus, PaymentMethod, Sale, SaleItem, User
-from utils.dependencies import can_read_sales, get_current_active_user, get_services
+from utils.dependencies import can_read_sales, get_current_user, get_services
 from utils.service_factory import ServiceFactory
 
-router = APIRouter(prefix="/sales", tags=["Sales"])
+router = APIRouter(
+    prefix="/sales",
+    tags=["Sales"],
+    responses={401: {"description": "Unauthorized"}},
+)
 
 
 logger = logging.getLogger("sales_router")
@@ -72,7 +76,7 @@ async def create_payment(
     payment_method: PaymentMethod = PaymentMethod.CASH,
     sale_status: OrderStatus = OrderStatus.PAID,
     services: ServiceFactory = Depends(get_services),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Создание продажи и чека"""
     try:

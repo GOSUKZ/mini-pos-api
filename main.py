@@ -23,6 +23,7 @@ from core.init_db import create_database
 
 # Импортируем роутеры
 from routers import (
+    analytics,
     audit,
     auth,
     global_product,
@@ -30,7 +31,6 @@ from routers import (
     metrics,
     sales,
     user,
-    warehouse,
 )
 from routers.metrics import increment_metric
 
@@ -155,7 +155,7 @@ if not settings.DEBUG:
 app.include_router(auth.router)
 app.include_router(global_product.router)
 app.include_router(local_product.router)
-# app.include_router(warehouse.router)
+app.include_router(analytics.router)
 app.include_router(audit.router)
 app.include_router(user.router)
 app.include_router(sales.router)
