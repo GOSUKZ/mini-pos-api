@@ -131,10 +131,6 @@ class SalesService:
         """
         Отмена продажи, обновляет статус на "cancelled".
         """
-        sale_details = await self.db_service.get_sale_details(order_id)
-        if not sale_details or sale_details["status"] in ["paid", "cancelled"]:
-            return False  # Нельзя отменить уже оплаченное или отменённое
-
         success = await self.db_service.cancel_sale(order_id)
 
         return success

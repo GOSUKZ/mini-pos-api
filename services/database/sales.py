@@ -72,7 +72,7 @@ class SalesDataService(DatabaseService):
         try:
             async with self.pool.acquire() as conn:
                 result = await conn.execute(
-                    "UPDATE sales SET status = $1 WHERE order_id = $2", status.value, order_id
+                    "UPDATE sales SET status = $1 WHERE order_id = $2", status, order_id
                 )
             return result == "UPDATE 1"
         except Exception as e:

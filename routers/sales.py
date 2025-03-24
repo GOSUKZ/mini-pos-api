@@ -121,20 +121,20 @@ async def change_status(
 #     return {"order_id": order_id, "message": "Оплата подтверждена"}
 
 
-# @router.delete(
-#     "/cancel", status_code=status.HTTP_202_ACCEPTED, response_model=CreateSaleResponseDTO
-# )
-# async def cancel_sale(order_id: str, services: ServiceFactory = Depends(get_services)):
-#     """
-#     Отменяет продажу.
-#     """
-#     success = await services.get_sales_service().cancel_sale(order_id)
-#     if not success:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось отменить продажу"
-#         )
+@router.delete(
+    "/cancel", status_code=status.HTTP_202_ACCEPTED, response_model=CreateSaleResponseDTO
+)
+async def cancel_sale(order_id: str, services: ServiceFactory = Depends(get_services)):
+    """
+    Отменяет продажу.
+    """
+    success = await services.get_sales_service().cancel_sale(order_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось отменить продажу"
+        )
 
-#     return {"order_id": order_id}
+    return {"order_id": order_id}
 
 
 @router.get("/{order_id}", response_model=Sale)
