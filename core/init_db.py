@@ -55,7 +55,7 @@ TABLES = {
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),
             sku_code VARCHAR,
-            barcode VARCHAR UNIQUE,
+            barcode VARCHAR,
             unit VARCHAR,
             sku_name VARCHAR,
             status_1c VARCHAR,

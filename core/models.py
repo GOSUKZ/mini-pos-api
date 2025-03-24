@@ -29,6 +29,11 @@ class PaymentMethod(str, Enum):
     OTHER = "other"
 
 
+class OrderStatus(str, Enum):
+    PAID = "paid"
+    UNPAID = "unpaid"
+
+
 class Currency(str, Enum):
     KZT = "KZT"
     USD = "USD"

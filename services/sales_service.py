@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from core.models import SaleItem
+from core.models import OrderStatus, SaleItem
 from services.database.sales import SalesDataService
 
 logger = logging.getLogger("sales_service")
@@ -80,16 +80,36 @@ class SalesService:
             raise
 
     async def create_sale(
-        self, user_id: int, items: List[SaleItem], currency: str, payment_method: str
+        self,
+        user_id: int,
+        items: List[SaleItem],
+        currency: str,
+        payment_method: str,
+        status: OrderStatus,
     ) -> str:
         """Создание продажи и чека"""
         try:
             order_id = await self.db_service.create_sale(
-                currency=currency, items=items, payment_method=payment_method, user_id=user_id
+                currency=currency,
+                items=items,
+                payment_method=payment_method,
+                user_id=user_id,
+                status=status,
             )
             return order_id
         except Exception as e:
             logger.error("Ошибка при создании продажи: %s", str(e))
+            raise
+
+    async def change_status(self, order_id: str, status: OrderStatus) -> bool:
+        """
+        Изменяет статус продажи на status
+        """
+        try:
+            await self.db_service.update_sale_status(order_id, status.value)
+            return True
+        except Exception as e:
+            logger.error("Ошибка при изменении статуса продажи: %s", str(e))
             raise
 
     async def confirm_payment(self, order_id: str) -> bool:

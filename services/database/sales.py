@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from core.models import SaleItem
+from core.models import OrderStatus, SaleItem
 
 from .base import DatabaseService
 
@@ -20,7 +20,12 @@ class SalesDataService(DatabaseService):
                 return f"ORD-{last_number}"
 
     async def create_sale(
-        self, user_id: int, items: List[SaleItem], currency: str, payment_method: str
+        self,
+        user_id: int,
+        items: List[SaleItem],
+        currency: str,
+        payment_method: str,
+        status: OrderStatus,
     ) -> str:
         """Создание продажу и возвращает order_id"""
         try:
@@ -35,7 +40,7 @@ class SalesDataService(DatabaseService):
                         user_id,
                         total_amount,
                         currency,
-                        "pending",
+                        status.value,
                     )
 
                     for item in items:
@@ -62,12 +67,12 @@ class SalesDataService(DatabaseService):
             logger.error("Ошибка при создании записи о продаже %s: %s", order_id, str(e))
             return False
 
-    async def update_sale_status(self, order_id: str, status: str) -> bool:
+    async def update_sale_status(self, order_id: str, status: OrderStatus) -> bool:
         """Обновляет статус продажи"""
         try:
             async with self.pool.acquire() as conn:
                 result = await conn.execute(
-                    "UPDATE sales SET status = $1 WHERE order_id = $2", status, order_id
+                    "UPDATE sales SET status = $1 WHERE order_id = $2", status.value, order_id
                 )
             return result == "UPDATE 1"
         except Exception as e:
