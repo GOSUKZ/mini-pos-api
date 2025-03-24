@@ -25,7 +25,7 @@ router = APIRouter(
 
 
 @router.get("/", response_model=WarehouseResponseDTO)
-@cache(namespace="warehouses")
+# @cache(namespace="warehouses")
 async def get_warehouses(
     skip: int = 0,
     limit: int = 100,

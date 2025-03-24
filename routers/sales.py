@@ -26,7 +26,7 @@ logger = logging.getLogger("sales_router")
 
 
 @router.get("/", response_model=SaleResponseDTO)
-@cache(namespace="sales")
+# @cache(namespace="sales")
 async def read_sales(
     skip: int = 0,
     limit: int = 100,
