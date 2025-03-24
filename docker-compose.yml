@@ -19,21 +19,9 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
             - ./postgres-init:/docker-entrypoint-initdb.d
-    pgadmin:
-        image: dpage/pgadmin4
-        container_name: pgadmin4_container
-        restart: always
-        ports:
-            - '8888:80'
-        environment:
-            PGADMIN_DEFAULT_EMAIL: nekgo2009@gmail.com
-            PGADMIN_DEFAULT_PASSWORD: qwerty
-        volumes:
-            - pgadmin-data:/var/lib/pgadmin
     redis:
         image: redis:alpine
         restart: always
 
 volumes:
     postgres_data:
-    pgadmin-data:
