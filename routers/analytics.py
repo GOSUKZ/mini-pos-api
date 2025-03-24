@@ -22,8 +22,8 @@ router = APIRouter(
 
 @router.get("/sales", response_model=SalesAnalyticsDTO)
 async def get_sales_analytics(
-    start_date: Optional[datetime] = datetime.now() - timedelta(weeks=1),
-    end_date: Optional[datetime] = datetime.now(),
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     current_user: User = Depends(get_current_user),
     services: ServiceFactory = Depends(get_services),
 ):
@@ -34,6 +34,9 @@ async def get_sales_analytics(
         start_date = datetime.now() - timedelta(weeks=1)
     if end_date is None:
         end_date = datetime.now()
+
+    print("START DATE", start_date)
+    print("END DATE", end_date)
     analytics = await services.get_sales_service().get_sales_analytics(
         current_user.id, start_date, end_date
     )
