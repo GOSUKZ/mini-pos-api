@@ -10,7 +10,7 @@ services:
             - .env
         depends_on:
             - postgres
-            - redis
+            # - redis
     postgres:
         image: postgres:latest
         restart: always
