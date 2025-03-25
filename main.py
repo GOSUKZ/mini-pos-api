@@ -22,17 +22,7 @@ from config import get_settings
 from core.init_db import create_database
 
 # Импортируем роутеры
-from routers import (
-    analytics,
-    audit,
-    auth,
-    global_product,
-    local_product,
-    metrics,
-    sales,
-    user,
-)
-from routers.metrics import increment_metric
+from routers import analytics, audit, auth, global_product, local_product, sales, user
 
 # Инициализируем настройки
 settings = get_settings()
@@ -92,7 +82,7 @@ async def custom_middleware(request: Request, call_next):
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
 
-    await increment_metric(request.url.path)  # Увеличиваем счетчик вызовов
+    # await increment_metric(request.url.path)  # Увеличиваем счетчик вызовов
 
     return response
 
@@ -159,7 +149,6 @@ app.include_router(analytics.router)
 app.include_router(audit.router)
 app.include_router(user.router)
 app.include_router(sales.router)
-app.include_router(metrics.router)
 
 
 @app.get("/", tags=["root"])
