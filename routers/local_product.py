@@ -34,12 +34,14 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from fastapi_cache.decorator import cache
 
 from core.dtos.local_product_response_dto import LocalProductResponseDTO
 from core.models import LocalProductCreate, LocalProductDTO, LocalProductUpdate, User
 from utils.dependencies import can_read_products, get_services
 from utils.service_factory import ServiceFactory
+
+# from fastapi_cache.decorator import cache
+
 
 logger = logging.getLogger("local_product_router")
 
@@ -52,7 +54,7 @@ router = APIRouter(
 
 
 @router.get("/", response_model=LocalProductResponseDTO)
-@cache(namespace="local-products")
+# @cache(namespace="local-products")
 async def read_products(
     skip: int = 0,
     limit: int = 100,

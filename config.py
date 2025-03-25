@@ -6,14 +6,9 @@ This module provides a class for configuration values.
 
 import os
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional
 
-# import redis.asyncio as redis
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
-from fastapi_cache import FastAPICache
-
-# from fastapi_cache.backends.redis import RedisBackend
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -81,18 +76,18 @@ def get_settings() -> Settings:
     return Settings()
 
 
-async def custom_key_builder(
-    func,
-    namespace: str,
-    *,
-    request: Optional[Request] = None,
-    response: Optional[Response] = None,
-    args: Tuple[Any, ...],
-    kwargs: Dict[str, Any],
-) -> str:
-    """Кастомный генератор ключа кэша."""
-    query_params = tuple(sorted(request.query_params.items())) if request else ()
-    return f"{namespace}:{request.url.path}:{query_params}"
+# async def custom_key_builder(
+#     func,
+#     namespace: str,
+#     *,
+#     request: Optional[Request] = None,
+#     response: Optional[Response] = None,
+#     args: Tuple[Any, ...],
+#     kwargs: Dict[str, Any],
+# ) -> str:
+#     """Кастомный генератор ключа кэша."""
+#     query_params = tuple(sorted(request.query_params.items())) if request else ()
+#     return f"{namespace}:{request.url.path}:{query_params}"
 
 
 # async def init_redis(app: FastAPI):

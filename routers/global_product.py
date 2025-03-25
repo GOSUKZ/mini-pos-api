@@ -6,7 +6,6 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from fastapi_cache.decorator import cache
 
 from core.dtos.product_response_dto import ProductResponseDTO
 from core.models import Product, ProductCreate, ProductUpdate, User

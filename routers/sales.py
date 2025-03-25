@@ -7,13 +7,15 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi_cache.decorator import cache
 
 from core.dtos.sale_response_dto import SaleResponseDTO
 from core.dtos.sales import CreateSaleResponseDTO, SaleMessageResponseDTO
 from core.models import Currency, OrderStatus, PaymentMethod, Sale, SaleItem, User
 from utils.dependencies import can_read_sales, get_current_user, get_services
 from utils.service_factory import ServiceFactory
+
+# from fastapi_cache.decorator import cache
+
 
 router = APIRouter(
     prefix="/sales",
