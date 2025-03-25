@@ -8,11 +8,12 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
-import redis.asyncio as redis
+# import redis.asyncio as redis
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
+
+# from fastapi_cache.backends.redis import RedisBackend
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -46,8 +47,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_REQUESTS: int = 100
     RATE_LIMIT_TIME_WINDOW: int = 60  # в секундах
 
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: str = os.getenv("REDIS_PORT", "6379")
+    # REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    # REDIS_PORT: str = os.getenv("REDIS_PORT", "6379")
 
     # Логирование
     LOG_LEVEL: str = "INFO"
@@ -94,28 +95,28 @@ async def custom_key_builder(
     return f"{namespace}:{request.url.path}:{query_params}"
 
 
-async def init_redis(app: FastAPI):
-    settings = get_settings()
-    redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}"
-    redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
-    FastAPICache.init(
-        RedisBackend(redis_client), prefix="fastapi-cache", key_builder=custom_key_builder
-    )
+# async def init_redis(app: FastAPI):
+#     settings = get_settings()
+#     redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}"
+#     redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+#     FastAPICache.init(
+#         RedisBackend(redis_client), prefix="fastapi-cache", key_builder=custom_key_builder
+#     )
 
 
-async def clear_warehouse_cache():
-    """
-    Clears all cached warehouse data from Redis.
+# async def clear_warehouse_cache():
+#     """
+#     Clears all cached warehouse data from Redis.
 
-    This function retrieves all keys related to cached warehouse data
-    from Redis using the prefix 'fastapi-cache:warehouses:' and deletes
-    them to ensure that the cache is cleared. It is useful for maintaining
-    data consistency by removing stale cache entries.
-    """
+#     This function retrieves all keys related to cached warehouse data
+#     from Redis using the prefix 'fastapi-cache:warehouses:' and deletes
+#     them to ensure that the cache is cleared. It is useful for maintaining
+#     data consistency by removing stale cache entries.
+#     """
 
-    redis_backend: RedisBackend = FastAPICache.get_backend()
-    redis_client: redis.Redis = redis_backend.redis
+#     redis_backend: RedisBackend = FastAPICache.get_backend()
+#     redis_client: redis.Redis = redis_backend.redis
 
-    keys = await redis_client.keys("fastapi-cache:warehouses:*")  # Найти все ключи складов
-    if keys:
-        await redis_client.delete(*keys)  # Удалить их
+#     keys = await redis_client.keys("fastapi-cache:warehouses:*")  # Найти все ключи складов
+#     if keys:
+#         await redis_client.delete(*keys)  # Удалить их

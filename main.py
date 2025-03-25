@@ -18,7 +18,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 # Импортируем настройки
-from config import get_settings, init_redis
+from config import get_settings
 from core.init_db import create_database
 
 # Импортируем роутеры
@@ -57,8 +57,8 @@ async def lifespan(_app: FastAPI):
     """
     # Code executed during application startup
     logger.info("Initializing application")
-    await init_redis(_app)  # Initialize Redis connection
-    logger.info("Redis connection established")
+    # await init_redis(_app)  # Initialize Redis connection
+    # logger.info("Redis connection established")
 
     # Create and initialize the database
     _app.db_pool = await create_database()

@@ -19,9 +19,9 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
             - ./postgres-init:/docker-entrypoint-initdb.d
-    redis:
-        image: redis:alpine
-        restart: always
+    # redis:
+    #     image: redis:alpine
+    #     restart: always
 
 volumes:
     postgres_data:
