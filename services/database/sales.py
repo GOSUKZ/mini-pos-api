@@ -275,86 +275,86 @@ class SalesDataService(DatabaseService):
     ):
         try:
             query = """
-                WITH 
-    sales_summary AS (
-        SELECT 
-            COUNT(*) AS total_sales_count,
-            COALESCE(SUM(total_amount), 0) AS total_sales_sum,
-            COUNT(*) FILTER (WHERE created_at >= NOW()::DATE) AS sales_today
-        FROM sales
-        WHERE user_id = $1
-            AND created_at BETWEEN $2 AND $3
-    ),
-    paid_unpaid_summary AS (
-        SELECT 
-            COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) AS total_paid_sum,
-            COALESCE(SUM(CASE WHEN status = 'unpaid' THEN total_amount ELSE 0 END), 0) AS total_unpaid_sum
-        FROM sales
-        WHERE user_id = $1
-            AND created_at BETWEEN $2 AND $3
-    ),
-    latest_orders AS (
-        SELECT 
-            order_id, status, total_amount, created_at
-        FROM sales
-        WHERE user_id = $1
-            AND created_at BETWEEN $2 AND $3
-        ORDER BY created_at DESC
-        LIMIT 5
-    ),
-    top_products AS (
-        SELECT 
-            si.product_id,
-            lp.sku_name AS product_name,
-            lp.price AS product_price,
-            SUM(si.quantity) AS total_sold
-        FROM sales_items si
-        JOIN local_products lp ON si.product_id = lp.id
-        JOIN sales s ON si.sale_id = s.id
-        WHERE s.user_id = $1
-            AND s.created_at BETWEEN $2 AND $3
-        GROUP BY si.product_id, lp.sku_name, lp.price
-        ORDER BY total_sold DESC
-        LIMIT 5
-    ),
-    avg_invoice AS (
-        SELECT 
-            COALESCE(AVG(total_amount), 0) AS average_invoice
-        FROM sales
-        WHERE user_id = $1
-            AND created_at BETWEEN $2 AND $3
-    ),
-    profit_calc AS (
-        SELECT 
-            COALESCE(SUM(si.price * si.quantity) - SUM(si.cost_price * si.quantity), 0) AS profit
-        FROM sales_items si
-        JOIN sales s ON si.sale_id = s.id
-        WHERE s.user_id = $1
-            AND s.created_at BETWEEN $2 AND $3
-    )
-
-SELECT 
-    ss.total_sales_count,
-    ss.total_sales_sum,
-    ss.sales_today,
-    pus.total_paid_sum,
-    ROUND(COALESCE((pus.total_paid_sum / NULLIF(ss.total_sales_sum, 0)) * 100, 0), 2) AS paid_percentage,
-    pus.total_unpaid_sum,
-    ROUND(COALESCE((pus.total_unpaid_sum / NULLIF(ss.total_sales_sum, 0)) * 100, 0), 2) AS unpaid_percentage,
-    ai.average_invoice,
-    pc.profit,
-    COALESCE(jsonb_agg(DISTINCT lo) FILTER (WHERE lo.order_id IS NOT NULL), '[]'::jsonb) AS latest_orders,
-    COALESCE(jsonb_agg(DISTINCT tp) FILTER (WHERE tp.product_id IS NOT NULL), '[]'::jsonb) AS top_products
-FROM sales_summary ss
-JOIN paid_unpaid_summary pus ON TRUE
-JOIN avg_invoice ai ON TRUE
-JOIN profit_calc pc ON TRUE
-LEFT JOIN latest_orders lo ON TRUE
-LEFT JOIN top_products tp ON TRUE
-GROUP BY ss.total_sales_count, ss.total_sales_sum, ss.sales_today, 
-         pus.total_paid_sum, ss.total_sales_sum, pus.total_unpaid_sum, 
-         ai.average_invoice, pc.profit;
-
+                WITH
+                    sales_summary AS (
+                        SELECT
+                            COUNT(*) AS total_sales_count,
+                            COALESCE(SUM(total_amount), 0) AS total_sales_sum,
+                            COUNT(*) FILTER (WHERE created_at >= NOW()::DATE) AS sales_today
+                        FROM sales
+                        WHERE user_id = $1
+                            AND created_at BETWEEN $2 AND $3
+                    ),
+                    paid_unpaid_summary AS (
+                        SELECT
+                            COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) AS total_paid_sum,
+                            COALESCE(SUM(CASE WHEN status = 'unpaid' THEN total_amount ELSE 0 END), 0) AS total_unpaid_sum
+                        FROM sales
+                        WHERE user_id = $1
+                            AND created_at BETWEEN $2 AND $3
+                    ),
+                    latest_orders_base AS ( -- Базовый CTE для последних заказов
+                        SELECT
+                            order_id, status, total_amount, created_at
+                        FROM sales
+                        WHERE user_id = $1
+                            AND created_at BETWEEN $2 AND $3
+                        ORDER BY created_at DESC
+                        LIMIT 5
+                    ),
+                    top_products_base AS ( -- Базовый CTE для топ продуктов
+                        SELECT
+                            si.product_id,
+                            lp.sku_name AS product_name,
+                            lp.price AS product_price,
+                            SUM(si.quantity) AS total_sold
+                        FROM sales_items si
+                        JOIN local_products lp ON si.product_id = lp.id
+                        JOIN sales s ON si.sale_id = s.id
+                        WHERE s.user_id = $1
+                            AND s.created_at BETWEEN $2 AND $3
+                        GROUP BY si.product_id, lp.sku_name, lp.price
+                        ORDER BY total_sold DESC
+                        LIMIT 5
+                    ),
+                    avg_invoice AS (
+                        SELECT
+                            COALESCE(AVG(total_amount), 0) AS average_invoice
+                        FROM sales
+                        WHERE user_id = $1
+                            AND created_at BETWEEN $2 AND $3
+                    ),
+                    profit_calc AS (
+                        SELECT
+                            COALESCE(SUM(si.price * si.quantity) - SUM(si.cost_price * si.quantity), 0) AS profit
+                        FROM sales_items si
+                        JOIN sales s ON si.sale_id = s.id
+                        WHERE s.user_id = $1
+                            AND s.created_at BETWEEN $2 AND $3
+                    )
+                SELECT
+                    ss.total_sales_count,
+                    ss.total_sales_sum,
+                    ss.sales_today,
+                    pus.total_paid_sum,
+                    ROUND(COALESCE((pus.total_paid_sum / NULLIF(ss.total_sales_sum, 0)) * 100, 0), 2) AS paid_percentage,
+                    pus.total_unpaid_sum,
+                    ROUND(COALESCE((pus.total_unpaid_sum / NULLIF(ss.total_sales_sum, 0)) * 100, 0), 2) AS unpaid_percentage,
+                    ai.average_invoice,
+                    pc.profit,
+                    -- Скалярный подзапрос для latest_orders с явной сортировкой внутри jsonb_agg
+                    (SELECT COALESCE(jsonb_agg(lo ORDER BY lo.created_at DESC), '[]'::jsonb)
+                    FROM latest_orders_base lo
+                    ) AS latest_orders,
+                    -- Скалярный подзапрос для top_products с явной сортировкой внутри jsonb_agg
+                    (SELECT COALESCE(jsonb_agg(tp ORDER BY tp.total_sold DESC), '[]'::jsonb)
+                    FROM top_products_base tp
+                    ) AS top_products
+                FROM sales_summary ss
+                -- Используем CROSS JOIN, так как все эти CTE возвращают ровно одну строку
+                CROSS JOIN paid_unpaid_summary pus
+                CROSS JOIN avg_invoice ai
+                CROSS JOIN profit_calc pc;
             """
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(query, user_id, start_date, end_date)

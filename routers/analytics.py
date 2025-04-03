@@ -41,6 +41,8 @@ async def get_sales_analytics(
         current_user.id, start_date, end_date
     )
 
+    print(analytics["latest_orders"])
+
     if not analytics:
         return SalesAnalyticsDTO(
             average_invoice=0,
