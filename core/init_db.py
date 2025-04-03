@@ -92,7 +92,9 @@ TABLES = {
         CREATE TABLE IF NOT EXISTS sales_items (
             id SERIAL PRIMARY KEY,
             sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-            product_id INTEGER NOT NULL REFERENCES local_products(id),
+            product_id INTEGER REFERENCES local_products(id) ON DELETE SET NULL,
+            product_name TEXT NOT NULL,
+            barcode TEXT NOT NULL,
             quantity INTEGER NOT NULL,
             price NUMERIC NOT NULL,
             cost_price NUMERIC NOT NULL,

@@ -517,6 +517,17 @@ class ProductService:
             logger.error("Ошибка при удалении локального продукта %s: %s", product_id, str(e))
             raise
 
+    async def update_sales_items_for_deleted_product(self, product_id: int) -> bool:
+        """
+        Обновляет связанные записи в sales_items, устанавливая product_id в NULL.
+        """
+        try:
+            result = await self.db_service.update_sales_items_for_deleted_product(product_id)
+            return result
+        except Exception as e:
+            logger.error("Ошибка при обновлении sales_items для товара с ID %s: %s", product_id, e)
+            raise
+
     def _validate_product_data(self, product_data: Dict[str, Any]) -> None:
         """
         Проверяет данные товара на соответствие бизнес-правилам.

@@ -260,6 +260,8 @@ async def delete_product(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     try:
+        # await services.get_product_service().update_sales_items_for_deleted_product(product_id)
+
         result = await services.get_product_service().delete_local_product(product_id=product_id)
 
         if not result:

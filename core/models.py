@@ -565,13 +565,22 @@ class WarehouseCreate(BaseModel):
 class OrderItem(BaseModel):
     id: int
     sale_id: int
-    product_id: int
-    sku_name: str
-    # warehouse_id: Optional[str] = None
+    product_id: Optional[int] = None
+    product_name: str
+    barcode: str
     quantity: int
     price: float
     cost_price: float
     total: float
+
+
+class SaleItem(BaseModel):
+    product_id: int
+    product_name: str
+    barcode: str
+    quantity: int
+    price: float
+    cost_price: float
 
 
 class Sale(BaseModel):
@@ -583,11 +592,3 @@ class Sale(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[OrderItem]
-
-
-class SaleItem(BaseModel):
-    product_id: int
-    quantity: int
-    price: float
-    cost_price: float
-    # warehouse_id: Optional[str] = None

@@ -45,13 +45,15 @@ class SalesDataService(DatabaseService):
 
                     for item in items:
                         await conn.execute(
-                            """INSERT INTO sales_items (sale_id, product_id, quantity, price, cost_price, total) VALUES ((SELECT id FROM sales WHERE order_id = $1), $2, $3, $4, $5, $6)""",
+                            """INSERT INTO sales_items (sale_id, product_id, quantity, price, cost_price, total, product_name, barcode) VALUES ((SELECT id FROM sales WHERE order_id = $1), $2, $3, $4, $5, $6, $7, $8)""",
                             order_id,
                             item.product_id,
                             item.quantity,
                             item.price,
                             item.cost_price,
                             item.price * item.quantity,
+                            item.product_name,
+                            item.barcode,
                         )
 
                     await conn.execute(
@@ -217,13 +219,6 @@ class SalesDataService(DatabaseService):
             params.append(end_date.replace(tzinfo=None))  # Убираем таймзону
             param_index += 1
 
-        # if warehouse_id is not None:
-        #     query_parts.append(
-        #         f"""AND id IN (SELECT product_id FROM sales_items WHERE warehouse_id = ${param_index})"""
-        #     )
-        #     params.append(warehouse_id)
-        #     param_index += 1
-
         valid_columns = ["id", "order_id", "total_amount", "currency", "status", "created_at"]
 
         if sort_by and sort_by in valid_columns:
@@ -247,9 +242,11 @@ class SalesDataService(DatabaseService):
 
             async with self.pool.acquire() as conn:
                 items_query = """
-                    SELECT si.*, p.sku_name 
+                    SELECT si.*, 
+                        COALESCE(p.sku_name, si.product_name) AS product_name, 
+                        COALESCE(p.barcode, si.barcode) AS barcode
                     FROM sales_items si
-                    JOIN local_products p ON si.product_id = p.id
+                    LEFT JOIN local_products p ON si.product_id = p.id
                     WHERE si.sale_id IN (SELECT id FROM sales WHERE order_id = ANY($1))
                 """
                 item_rows = await conn.fetch(items_query, order_ids)

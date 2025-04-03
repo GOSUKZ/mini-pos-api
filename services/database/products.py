@@ -630,3 +630,22 @@ class ProductsDataService(DatabaseService):
         except Exception as e:
             logger.error("Ошибка при удалении локального товара с ID %s: %s", product_id, e)
             raise
+
+    async def update_sales_items_for_deleted_product(self, product_id: int) -> bool:
+        """
+        Обновляет связанные записи в sales_items, устанавливая product_id в NULL.
+        """
+        query = """
+            UPDATE sales_items 
+            SET product_id = NULL 
+            WHERE product_id = $1
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.transaction():
+                    result = await conn.execute(query, product_id)
+
+            return result.startswith("UPDATE")
+        except Exception as e:
+            logger.error("Ошибка при обновлении sales_items для товара с ID %s: %s", product_id, e)
+            raise
