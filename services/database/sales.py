@@ -26,11 +26,18 @@ class SalesDataService(DatabaseService):
         currency: str,
         payment_method: str,
         status: OrderStatus,
+        discount_type: str,
+        discount_value: Optional[float],
     ) -> str:
         """Создание продажу и возвращает order_id"""
         try:
             order_id = await self.generate_order_id()
             total_amount = sum(item.price * item.quantity for item in items)
+
+            if discount_type == "percentage" and discount_value:
+                total_amount -= total_amount * (discount_value / 100)
+            elif discount_type == "fixedAmount" and discount_value:
+                total_amount -= discount_value
 
             async with self.pool.acquire() as conn:
                 async with conn.transaction():

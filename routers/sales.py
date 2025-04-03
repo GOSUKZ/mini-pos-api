@@ -10,7 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.dtos.sale_response_dto import SaleResponseDTO
 from core.dtos.sales import CreateSaleResponseDTO, SaleMessageResponseDTO
-from core.models import Currency, OrderStatus, PaymentMethod, Sale, SaleItem, User
+from core.models import (
+    Currency,
+    DiscountType,
+    OrderStatus,
+    PaymentMethod,
+    Sale,
+    SaleItem,
+    User,
+)
 from utils.dependencies import can_read_sales, get_current_user, get_services
 from utils.service_factory import ServiceFactory
 
@@ -76,6 +84,8 @@ async def create_payment(
     items: List[SaleItem],
     currency: Currency = Currency.KZT,
     payment_method: PaymentMethod = PaymentMethod.CASH,
+    discount_type: DiscountType = DiscountType.NONE,  # Новый параметр
+    discount_value: Optional[float] = None,
     sale_status: OrderStatus = OrderStatus.PAID,
     services: ServiceFactory = Depends(get_services),
     current_user: User = Depends(get_current_user),
@@ -88,6 +98,8 @@ async def create_payment(
             currency=currency,
             payment_method=payment_method,
             status=sale_status,
+            discount_type=discount_type,  # Передаем discount_type
+            discount_value=discount_value,
         )
 
         return {"order_id": order_id}

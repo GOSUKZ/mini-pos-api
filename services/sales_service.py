@@ -86,6 +86,8 @@ class SalesService:
         currency: str,
         payment_method: str,
         status: OrderStatus,
+        discount_type: str,  # Новый параметр
+        discount_value: Optional[float],
     ) -> str:
         """Создание продажи и чека"""
         try:
@@ -95,6 +97,8 @@ class SalesService:
                 payment_method=payment_method,
                 user_id=user_id,
                 status=status,
+                discount_type=discount_type,
+                discount_value=discount_value,
             )
             return order_id
         except Exception as e:

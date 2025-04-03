@@ -25,7 +25,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class PaymentMethod(str, Enum):
     CASH = "cash"
     CARD = "card"
-    BANK_TRANSFER = "bank_transfer"
     OTHER = "other"
 
 
@@ -39,6 +38,12 @@ class Currency(str, Enum):
     USD = "USD"
     EUR = "EUR"
     RUB = "RUB"
+
+
+class DiscountType(str, Enum):
+    NONE = "none"
+    PERCENTAGE = "percentage"
+    FIXED_AMOUNT = "fixedAmount"
 
 
 class ProductBase(BaseModel):
