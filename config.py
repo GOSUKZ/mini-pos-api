@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS настройки
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = ["https://mini-pos-swart.vercel.app"] # ["*"]
     CORS_HEADERS: List[str] = ["*"]
     CORS_METHODS: List[str] = ["*"]
 
